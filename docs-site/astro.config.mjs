@@ -19,7 +19,12 @@ export default defineConfig({
 			social: [
 				{
 					icon: 'github',
-					label: 'Google Credentio Source',
+					label: 'Credentio Contributions on GitHub',
+					href: 'https://github.com/ghchinoy/credentio-contributions',
+				},
+				{
+					icon: 'external',
+					label: 'Authoritative Google Credentio Source',
 					href: 'https://mediaprovenance.googlesource.com/credentio/',
 				},
 			],
