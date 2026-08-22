@@ -9,18 +9,29 @@ description: API documentation and usage patterns for the CredentioKit Swift pac
 
 ## 1. Installation
 
-### Swift Package Manager
-Add `CredentioKit` to your `Package.swift`:
+### Step 1: Compile the Native XCFramework
+`CredentioKit` uses `CredentioC.xcframework` (a static C-ABI archive) to execute Credentio directly in-process with zero subprocess overhead.
+
+Compile the static XCFramework from the repository root on macOS:
+
+```bash
+make build-swift
+```
+
+### Step 2: Add Local Package Dependency
+`CredentioKit` is currently distributed as a local package built from source (remote registry releases with pre-compiled XCFrameworks are planned for future releases).
+
+Reference the local package directory in your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/ghchinoy/credentio-contributions.git", from: "0.1.0")
+    .package(path: "../credentio-contributions/swift")
 ],
 targets: [
     .target(
         name: "MyAppleApp",
         dependencies: [
-            .product(name: "CredentioKit", package: "credentio-contributions")
+            .product(name: "CredentioKit", package: "swift")
         ]
     )
 ]
@@ -28,20 +39,7 @@ targets: [
 
 ---
 
-## 2. Compiling the Native XCFramework
-
-`CredentioKit` uses `CredentioC.xcframework` (a static C-ABI archive) to execute Credentio directly in-process with zero subprocess overhead.
-
-To build the static XCFramework:
-
-```bash
-# In the credentio-contributions repository:
-make build-swift
-```
-
----
-
-## 3. The `CredentioNativeEngine` Actor
+## 2. The `CredentioNativeEngine` Actor
 
 ### Initialization
 `CredentioNativeEngine` is an actor, guaranteeing compiler-enforced thread safety under Swift 6 strict concurrency.
@@ -86,7 +84,7 @@ do {
 
 ---
 
-## 4. Models and Types
+## 3. Models and Types
 
 ### `ProvenanceReport`
 ```swift
@@ -121,7 +119,7 @@ public struct Manifest: Sendable, Equatable, Identifiable {
 
 ---
 
-## 5. Standalone crJSON Deserializer
+## 4. Standalone crJSON Deserializer
 
 If you obtain crJSON strings from external sources (such as CLI logs or network payloads), you can deserialize them into a typed `ProvenanceReport`:
 

@@ -24,17 +24,19 @@ make build-swift
 ```
 
 ### 2. Add to Swift Package Manager
-Add `CredentioKit` as a dependency in your `Package.swift`:
+`CredentioKit` is currently distributed as a local package built from source (remote registry releases with pre-compiled XCFrameworks are planned for future releases).
+
+After running `make build-swift`, reference the local package directory in your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/ghchinoy/credentio-contributions.git", from: "0.1.0")
+    .package(path: "../credentio-contributions/swift")
 ],
 targets: [
     .target(
         name: "MyApp",
         dependencies: [
-            .product(name: "CredentioKit", package: "credentio-contributions")
+            .product(name: "CredentioKit", package: "swift")
         ]
     )
 ]
