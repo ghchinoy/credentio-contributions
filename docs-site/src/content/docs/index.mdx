@@ -3,49 +3,106 @@ title: Credentio Contributions
 description: High-performance Python, Go, and Swift bindings for Google Credentio C2PA Content Credentials.
 template: splash
 hero:
-  tagline: Native, in-process C2PA Content Credentials validation in Python, Go, and Swift — powered by Google Credentio.
+  tagline: Validate C2PA Content Credentials in Python, Go, and Swift. In-process, local-first, zero network overhead.
   actions:
     - text: Quick Start
       link: /credentio-contributions/getting-started/
       icon: right-arrow
       variant: primary
+    - text: CLI Tutorial
+      link: /credentio-contributions/cli/
+      icon: rocket
+      variant: secondary
     - text: Why Bindings?
       link: /credentio-contributions/why/
       icon: external
-      variant: secondary
+      variant: minimal
 ---
 
-import { Card, CardGrid } from '@astrojs/starlight/components';
+import { Card, CardGrid, LinkCard, Tabs, TabItem } from '@astrojs/starlight/components';
 
-## What is Google Credentio?
+## In-Process Media Provenance in 3 Lines
 
-As media provenance standards and transparency regulations take effect worldwide, verifying the origin and history of digital assets is essential for modern software.
+Verify C2PA Content Credentials directly in your application without network round-trips or subprocess startup latency:
 
-[Google Credentio](https://mediaprovenance.googlesource.com/credentio/) is an open-source C++ library for validating [C2PA (Coalition for Content Provenance and Authenticity)](https://c2pa.org/) Content Credentials across images, videos, audio, and documents. As highlighted in the [Google Developers Blog announcement](https://developers.googleblog.com/introducing-credentio-open-source-c-library-for-c2pa-content-credentials-from-google/), this is the exact engine running at scale across nearly 40 conformant Google products.
+<Tabs>
+  <TabItem label="Python" icon="seti:python">
+    ```python
+    from credentio import Validator
+
+    with Validator(skip_trust_checks=True) as validator:
+        report = validator.validate_file("photo.jpg")
+        print(f"Status: {report.badge.value.upper()}")  # 'SIGNED', 'UNSIGNED', 'INVALID'
+    ```
+  </TabItem>
+
+  <TabItem label="Go" icon="seti:go">
+    ```go
+    validator, _ := credentio.NewValidator(credentio.WithSkipTrustChecks(true))
+    defer validator.Close()
+
+    report, _ := validator.ValidateFile("photo.jpg", "image/jpeg")
+    fmt.Println("Status:", report.Badge()) // "signed", "unsigned", "invalid"
+    ```
+  </TabItem>
+
+  <TabItem label="Swift" icon="apple">
+    ```swift
+    let engine = CredentioNativeEngine(skipTrustChecks: true)
+    let report = try await engine.read(url: URL(fileURLWithPath: "photo.jpg"))
+    print("Status:", report.badge.rawValue.uppercased()) // "SIGNED", "UNSIGNED", "INVALID"
+    ```
+  </TabItem>
+</Tabs>
+
+---
+
+## Choose Your Language
+
+<CardGrid>
+  <LinkCard
+    title="Python (credentio)"
+    description="Modern cffi binding with typed dataclasses, context managers, and sub-millisecond execution."
+    href="/credentio-contributions/python/"
+  />
+  <LinkCard
+    title="Go (credentio/go)"
+    description="Idiomatic cgo package with thread-safe validators and standard encoding/json models."
+    href="/credentio-contributions/go/"
+  />
+  <LinkCard
+    title="Swift (CredentioKit)"
+    description="Actor-isolated Swift 6 package for macOS 14+ and iOS 16+ via a native static XCFramework."
+    href="/credentio-contributions/swift/"
+  />
+</CardGrid>
+
+---
+
+## Core Performance Principles
+
+Powered natively by [Google Credentio](https://mediaprovenance.googlesource.com/credentio/) (the C++ validation engine operating at scale across nearly 40 conformant C2PA-enabled Google products):
 
 <CardGrid stagger>
-  <Card title="Local-First Validation" icon="laptop">
-    Validates media files directly on your machine or server. Media content never leaves your environment, ensuring complete privacy, zero bandwidth overhead, and instant verdicts.
+  <Card title="Local-First Privacy" icon="laptop">
+    Media assets never leave your local environment. Validation runs entirely in-process, eliminating external API dependencies and bandwidth costs.
   </Card>
-  <Card title="Small Memory Footprint" icon="rocket">
-    Engineered to handle large multi-gigabyte video files and high-resolution imagery using minimal memory, making it ideal for high-throughput pipelines.
+  <Card title="Low Memory Footprint" icon="rocket">
+    Maintains a small, bounded memory footprint when verifying large multi-gigabyte video files or high-resolution imagery.
   </Card>
-  <Card title="Python (credentio)" icon="seti:python">
-    Modern Python package with typed dataclasses, context managers, and sub-millisecond in-process validation via `cffi`.
+  <Card title="Sub-Millisecond Speed" icon="random">
+    Runs core verification in **3 to 5 milliseconds** per asset, avoiding the 50 to 100 ms overhead of command-line subprocesses.
   </Card>
-  <Card title="Go (credentio/go)" icon="seti:go">
-    Idiomatic Go package with thread-safe validators, `encoding/json` models, and zero subprocess overhead via `cgo`.
-  </Card>
-  <Card title="Swift (CredentioKit)" icon="apple">
-    Actor-isolated Swift package for macOS 14+ and iOS 16+ supporting Swift 6 strict concurrency via static XCFramework.
+  <Card title="Multi-Format Support" icon="document">
+    Inspects embedded credentials in JPEG, PNG, WebP, AVIF, HEIC, MP4, MOV, MP3, WAV, FLAC, PDF, and Office documents.
   </Card>
 </CardGrid>
 
 ---
 
-## What This Project Provides
+## Unified Architecture
 
-Credentio is authored in C++20 with Bazel. **Credentio Contributions** bridges the C++ core into a universal C-ABI bridge, delivering first-class language bindings for developers working in Python, Go, and Swift.
+Each language binding shares the same underlying `extern "C"` binary bridge (`libcredentio_c`), ensuring consistent validation semantics and uniform output across all platforms:
 
 ```text
 ┌───────────────────────────┐  ┌───────────────────────────┐  ┌───────────────────────────┐
