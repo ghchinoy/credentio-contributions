@@ -1,6 +1,6 @@
 # Credentio Contributions
 
-[![CI](https://github.com/google/credentio-contributions/actions/workflows/ci.yml/badge.svg)](https://github.com/google/credentio-contributions/actions/workflows/ci.yml)
+[![CI](https://github.com/ghchinoy/credentio-contributions/actions/workflows/ci.yml/badge.svg)](https://github.com/ghchinoy/credentio-contributions/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
 Idiomatic, high-performance **Python**, **Go**, and **Swift** bindings for [Google Credentio](https://mediaprovenance.googlesource.com/credentio/), the C2PA Content Credentials validator.
