@@ -25,7 +25,7 @@ Whenever creating, updating, or reviewing documentation:
 1. **Write or Edit Docs:**
    Update documentation pages under `docs-site/src/content/docs/`, guides under `docs/`, or language `README.md` files.
 2. **Run Docstats and Editorial Linting:**
-   Run the `technical-post-editorial` evaluation using `/workspace/docstats` to audit prose for house style, active voice, and plain language (target score: 9.0 to 10.0 / 10; hard floor >= 7.0). Ensure zero em dashes in prose.
+   Run the `technical-post-editorial` evaluation using [docstats](https://github.com/ghchinoy/docstats) to audit prose for house style, active voice, and plain language (target score: 9.0 to 10.0 / 10; hard floor >= 7.0). Ensure zero em dashes in prose.
 3. **Score README Changes:**
    When writing or updating READMEs, evaluate against the Mark Allen quality rubric (`make-readme` skill; target score: >= 34 / 40, Excellent band).
 4. **Verify Static Build:**
@@ -37,13 +37,17 @@ Whenever creating, updating, or reviewing documentation:
 
 ## 3. Running Docstats and Editorial Skills
 
-The authoring tools live in `/workspace/docstats` and `/workspace/agent-skills/plugins/repo-authoring/skills/`:
+The authoring tools live in [docstats](https://github.com/ghchinoy/docstats) and [agent-skills](https://github.com/ghchinoy/agent-skills):
 
 ### Run Docstats Scorecard on Documentation
 ```bash
-uv run --directory /workspace/docstats python -c "
-import sys
-sys.path.insert(0, '/workspace/docstats')
+# Clone docstats and run the scorecard:
+git clone https://github.com/ghchinoy/docstats.git
+export DOCSTATS_DIR="$(pwd)/docstats"
+
+uv run --directory "$DOCSTATS_DIR" python -c "
+import sys, os
+sys.path.insert(0, os.environ['DOCSTATS_DIR'])
 from metrics import _sync_analyze_document
 
 files = ['docs-site/src/content/docs/why.md', 'README.md']
@@ -58,8 +62,8 @@ for f in files:
 ```
 
 ### Reference Agent Skills
-- **Technical Post Editorial:** `/workspace/agent-skills/plugins/repo-authoring/skills/technical-post-editorial/SKILL.md`
-- **Make README Rubric:** `/workspace/agent-skills/plugins/repo-authoring/skills/make-readme/SKILL.md`
+- **Technical Post Editorial:** [SKILL.md](https://github.com/ghchinoy/agent-skills/blob/main/plugins/repo-authoring/skills/technical-post-editorial/SKILL.md)
+- **Make README Rubric:** [SKILL.md](https://github.com/ghchinoy/agent-skills/blob/main/plugins/repo-authoring/skills/make-readme/SKILL.md)
 
 ---
 
