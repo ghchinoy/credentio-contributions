@@ -1,0 +1,42 @@
+# Compiled shared libraries and generated headers
+*.dylib
+*.so
+*.dll
+*.a
+*.lo
+
+native/libcredentio_c.*
+python/src/credentio/lib/
+python/src/credentio/include/
+go/lib/
+go/include/
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.venv/
+venv/
+
+# Go artifacts
+go/bin/
+*.test
+
+# Documentation site artifacts
+docs-site/node_modules/
+docs-site/dist/
+docs-site/.astro/
+
+# Swift artifacts
+swift/.build/
+swift/.swiftpm/
+swift/CredentioC.xcframework/
+*.xcodeproj
+Package.resolved
+
+# macOS cruft
+.DS_Store

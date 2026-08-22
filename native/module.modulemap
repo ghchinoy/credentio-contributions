@@ -1,0 +1,4 @@
+module CredentioC {
+    header "credentio_c.h"
+    export *
+}

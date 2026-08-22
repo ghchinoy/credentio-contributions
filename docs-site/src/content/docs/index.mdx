@@ -1,0 +1,66 @@
+---
+title: Credentio Contributions
+description: High-performance Python, Go, and Swift bindings for Google Credentio C2PA Content Credentials.
+template: splash
+hero:
+  tagline: Native, in-process C2PA Content Credentials validation in Python, Go, and Swift — powered by Google Credentio.
+  actions:
+    - text: Quick Start
+      link: /getting-started/
+      icon: right-arrow
+      variant: primary
+    - text: Why Bindings?
+      link: /why/
+      icon: external
+      variant: secondary
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## What is Google Credentio?
+
+As media provenance standards and transparency regulations take effect worldwide, verifying the origin and history of digital assets is essential for modern software.
+
+[Google Credentio](https://mediaprovenance.googlesource.com/credentio/) is an open-source C++ library for validating [C2PA (Coalition for Content Provenance and Authenticity)](https://c2pa.org/) Content Credentials across images, videos, audio, and documents. As highlighted in the [Google Developers Blog announcement](https://developers.googleblog.com/introducing-credentio-open-source-c-library-for-c2pa-content-credentials-from-google/), this is the exact engine running at scale across nearly 40 conformant Google products.
+
+<CardGrid stagger>
+  <Card title="Local-First Validation" icon="laptop">
+    Validates media files directly on your machine or server. Media content never leaves your environment, ensuring complete privacy, zero bandwidth overhead, and instant verdicts.
+  </Card>
+  <Card title="Small Memory Footprint" icon="rocket">
+    Engineered to handle large multi-gigabyte video files and high-resolution imagery using minimal memory, making it ideal for high-throughput pipelines.
+  </Card>
+  <Card title="Python (credentio)" icon="seti:python">
+    Modern Python package with typed dataclasses, context managers, and sub-millisecond in-process validation via `cffi`.
+  </Card>
+  <Card title="Go (credentio/go)" icon="seti:go">
+    Idiomatic Go package with thread-safe validators, `encoding/json` models, and zero subprocess overhead via `cgo`.
+  </Card>
+  <Card title="Swift (CredentioKit)" icon="apple">
+    Actor-isolated Swift package for macOS 14+ and iOS 16+ supporting Swift 6 strict concurrency via static XCFramework.
+  </Card>
+</CardGrid>
+
+---
+
+## What This Project Provides
+
+Credentio is authored in C++20 with Bazel. **Credentio Contributions** bridges the C++ core into a universal C-ABI bridge, delivering first-class language bindings for developers working in Python, Go, and Swift.
+
+```text
+┌───────────────────────────┐  ┌───────────────────────────┐  ┌───────────────────────────┐
+│     Python (credentio)    │  │     Go (credentio/go)     │  │    Swift (CredentioKit)   │
+│  - cffi dynamic binding   │  │  - cgo native binding     │  │  - Actor-isolated Swift   │
+│  - Typed dataclasses      │  │  - Idiomatic Go structs   │  │  - Static XCFramework     │
+└─────────────┬─────────────┘  └─────────────┬─────────────┘  └─────────────┬─────────────┘
+              │                              │                              │
+              └──────────────────────────────┼──────────────────────────────┘
+                                             │
+                           ┌─────────────────▼─────────────────┐
+                           │      libcredentio_c (C-ABI)       │
+                           └─────────────────┬─────────────────┘
+                                             │
+                           ┌─────────────────▼─────────────────┐
+                           │      Google Credentio (C++20)     │
+                           └───────────────────────────────────┘
+```

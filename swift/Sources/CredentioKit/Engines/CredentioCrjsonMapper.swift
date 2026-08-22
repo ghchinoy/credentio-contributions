@@ -1,0 +1,208 @@
+// Copyright 2026 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+import Foundation
+
+/// Maps Credentio's "crjson" output format into an engine-agnostic `ProvenanceReport`.
+///
+/// Credentio emits a JSON structure where:
+/// - `manifests` is an Array of manifest dictionaries
+/// - `assertions` is an Object keyed by assertion label (e.g. `assertions["c2pa.actions"]`)
+/// - `claim` holds `claim_generator_info`, `signature_info`, `instanceID`, etc.
+/// - `validation` holds validation statuses
+public enum CredentioCrjsonMapper {
+
+    /// Maps raw crjson string into a `ProvenanceReport`.
+    public static func mapReport(
+        json: String,
+        mediaType: String,
+        elapsed: Duration,
+        engineInternalElapsed: Duration? = nil,
+        engineID: String = "credentio",
+        engineName: String = "Credentio (Google)"
+    ) -> ProvenanceReport {
+        guard
+            let root = (try? JSONSerialization.jsonObject(
+                with: Data(json.utf8)
+            )) as? [String: Any]
+        else {
+            return ProvenanceReport(
+                engineID: engineID,
+                engineName: engineName,
+                hasCredentials: false,
+                elapsed: elapsed,
+                engineInternalElapsed: engineInternalElapsed,
+                mediaType: mediaType,
+                rawJSON: json
+            )
+        }
+
+        var manifests: [Manifest] = []
+
+        if let manifestsArray = root["manifests"] as? [[String: Any]] {
+            for (index, dict) in manifestsArray.enumerated() {
+                manifests.append(mapManifest(dict: dict, defaultLabel: "manifest_\(index)"))
+            }
+        } else if let manifestsDict = root["manifests"] as? [String: Any] {
+            // In case crjson structure is an object keyed by label
+            for (label, value) in manifestsDict {
+                if let dict = value as? [String: Any] {
+                    manifests.append(mapManifest(dict: dict, defaultLabel: label))
+                }
+            }
+        }
+
+        let active = manifests.first
+        let ingredients = manifests.count > 1 ? Array(manifests.dropFirst()) : []
+
+        let validationResults = root["validation_results"] as? [String: Any]
+        let specVersion = root["spec_version"] as? String
+            ?? validationResults?["spec_version"] as? String
+            ?? validationResults?["version"] as? String
+
+        return ProvenanceReport(
+            engineID: engineID,
+            engineName: engineName,
+            hasCredentials: active != nil,
+            elapsed: elapsed,
+            engineInternalElapsed: engineInternalElapsed,
+            mediaType: mediaType,
+            specVersion: specVersion,
+            activeManifest: active,
+            ingredientManifests: ingredients,
+            rawJSON: json
+        )
+    }
+
+    private static func mapManifest(dict: [String: Any], defaultLabel: String) -> Manifest {
+        let label = dict["label"] as? String ?? defaultLabel
+        let title = dict["title"] as? String
+        let format = dict["format"] as? String
+        let isUpdateManifest = dict["is_update_manifest"] as? Bool ?? false
+
+        let claimDict = dict["claim"] as? [String: Any]
+
+        // Claim generator extraction
+        var claimGenerator: String?
+        let genInfoList = (claimDict?["claim_generator_info"] as? [[String: Any]])
+            ?? (dict["claim_generator_info"] as? [[String: Any]])
+        if let first = genInfoList?.first {
+            let name = first["name"] as? String
+            let version = first["version"] as? String
+            claimGenerator = [name, version].compactMap { $0 }.joined(separator: " ")
+        }
+        if claimGenerator == nil {
+            claimGenerator = (claimDict?["claim_generator"] as? String) ?? (dict["claim_generator"] as? String)
+        }
+
+        // Signature extraction
+        let sigDict = (claimDict?["signature_info"] as? [String: Any])
+            ?? (dict["signature_info"] as? [String: Any])
+            ?? (claimDict?["signature"] as? [String: Any])
+        let signature = mapSignature(sigDict)
+
+        // Assertions extraction: in crjson, assertions is an object keyed by label
+        var assertions: [Assertion] = []
+        if let assertionsDict = dict["assertions"] as? [String: Any] {
+            for (assertionLabel, assertionValue) in assertionsDict {
+                let kind = Assertion.Kind.classify(label: assertionLabel)
+                let summary = summarizeAssertion(label: assertionLabel, value: assertionValue)
+                assertions.append(Assertion(label: assertionLabel, kind: kind, summary: summary))
+            }
+        } else if let assertionsArray = dict["assertions"] as? [[String: Any]] {
+            for entry in assertionsArray {
+                guard let assertionLabel = entry["label"] as? String else { continue }
+                let kind = Assertion.Kind.classify(label: assertionLabel)
+                let summary = summarizeAssertion(label: assertionLabel, value: entry["data"] ?? entry)
+                assertions.append(Assertion(label: assertionLabel, kind: kind, summary: summary))
+            }
+        }
+        assertions.sort { $0.label < $1.label }
+
+        // Validation status extraction
+        var statuses: [ValidationStatus] = []
+        if let validationObj = dict["validation"] as? [String: Any],
+           let statusList = validationObj["status"] as? [[String: Any]] {
+            statuses = mapValidationStatuses(statusList)
+        } else if let statusList = dict["validation_status"] as? [[String: Any]] {
+            statuses = mapValidationStatuses(statusList)
+        }
+
+        return Manifest(
+            label: label,
+            title: title,
+            format: format,
+            claimGenerator: claimGenerator,
+            isUpdateManifest: isUpdateManifest,
+            signature: signature,
+            assertions: assertions,
+            validationStatuses: statuses
+        )
+    }
+
+    private static func mapSignature(_ dict: [String: Any]?) -> SignatureInfo? {
+        guard let dict else { return nil }
+        var time: Date?
+        if let timeString = dict["time"] as? String ?? dict["date_time"] as? String {
+            time = ISO8601DateFormatter().date(from: timeString)
+        }
+        return SignatureInfo(
+            issuer: dict["issuer"] as? String ?? dict["common_name"] as? String,
+            algorithm: dict["alg"] as? String ?? dict["algorithm"] as? String,
+            time: time,
+            certChainSummary: dict["cert_serial_number"] as? String
+        )
+    }
+
+    private static func summarizeAssertion(label: String, value: Any) -> String? {
+        guard let dict = value as? [String: Any] else { return nil }
+        if let actions = dict["actions"] as? [[String: Any]] {
+            let names = actions.compactMap { $0["action"] as? String }
+            if !names.isEmpty { return names.joined(separator: ", ") }
+        }
+        if let hashValue = dict["hash_value"] as? String {
+            return "hash: \(hashValue.prefix(16))…"
+        }
+        return nil
+    }
+
+    private static func mapValidationStatuses(_ array: [[String: Any]]) -> [ValidationStatus] {
+        array.compactMap { entry in
+            guard let code = entry["code"] as? String else { return nil }
+            return ValidationStatus(
+                code: code,
+                explanation: entry["explanation"] as? String,
+                url: entry["url"] as? String,
+                severity: severity(forCode: code)
+            )
+        }
+    }
+
+    private static func severity(forCode code: String) -> ValidationStatus.Severity {
+        let lowered = code.lowercased()
+        if lowered.contains("not")
+            || lowered.contains("invalid")
+            || lowered.contains("mismatch")
+            || lowered.contains("missing")
+            || lowered.contains("untrusted")
+            || lowered.contains("fail")
+            || lowered.contains("error") {
+            return .error
+        }
+        if lowered.contains("validated") || lowered.contains("trusted") || lowered.contains("success") || lowered.contains("ok") {
+            return .info
+        }
+        return .warning
+    }
+}
