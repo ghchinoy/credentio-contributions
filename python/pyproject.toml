@@ -35,6 +35,9 @@ dev = [
     "pytest>=7.0",
 ]
 
+[project.scripts]
+credentio = "credentio.cli:main"
+
 [tool.setuptools.packages.find]
 where = ["src"]
 

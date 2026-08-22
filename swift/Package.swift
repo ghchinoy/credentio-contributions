@@ -46,12 +46,28 @@ let package = Package(
             name: "CredentioKit",
             targets: ["CredentioKit"]
         ),
+        .executable(
+            name: "credentio-cli",
+            targets: ["credentio-cli"]
+        ),
+    ],
+    dependencies: [
+        .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.3.0"),
     ],
     targets: [
         .target(
             name: "CredentioKit",
             dependencies: credentioKitDeps,
             path: "Sources/CredentioKit",
+            linkerSettings: credentioKitLinkerSettings
+        ),
+        .executableTarget(
+            name: "credentio-cli",
+            dependencies: [
+                "CredentioKit",
+                .product(name: "ArgumentParser", package: "swift-argument-parser")
+            ],
+            path: "Sources/credentio-cli",
             linkerSettings: credentioKitLinkerSettings
         ),
         .testTarget(

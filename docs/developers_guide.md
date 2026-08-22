@@ -138,3 +138,14 @@ To test:
 ```bash
 make swift-test
 ```
+
+---
+
+## 8. Command-Line Tools & Scripts
+
+All three bindings expose thin CLI entry points:
+- **Python:** `credentio.cli:main` registered as console script `credentio` via `pyproject.toml`.
+- **Go:** `go/cmd/credentio/main.go` producing executable binary `credentio`.
+- **Swift:** `swift/Sources/credentio-cli` built with `swift-argument-parser` producing `credentio-cli`.
+
+See the [CLI Tutorial](https://ghchinoy.github.io/credentio-contributions/cli/) on the documentation site for execution patterns and shell exit codes.

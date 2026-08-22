@@ -1,0 +1,180 @@
+---
+title: Command-Line Tools & Tutorial
+description: Hands-on CLI tutorial for validating C2PA Content Credentials in Python, Go, and Swift.
+---
+
+import { Tabs, TabItem } from '@astrojs/starlight/components';
+
+This tutorial guides you through installing, building, and running the `credentio validate` command-line tool across **Python**, **Go**, and **Swift**.
+
+---
+
+## 1. Getting a Sample C2PA Asset
+
+To test content credential verification, you can use any C2PA-signed media file or download sample assets from the [C2PA Public Conformance Samples](https://github.com/c2pa-org/conformance-public/tree/main/test-fixtures) or [Content Authenticity Initiative (CAI) test files](https://github.com/contentauth/c2pa-rs/tree/main/sample).
+
+```bash
+# Example: download a public C2PA test image
+curl -sLO https://raw.githubusercontent.com/c2pa-org/conformance-public/main/test-fixtures/image/image_signed.jpg
+```
+
+---
+
+## 2. CLI Walkthrough by Language
+
+<Tabs>
+  <TabItem label="Python" icon="seti:python">
+    ### 1. Build the Native Library & Install Package
+    ```bash
+    # Build libcredentio_c.dylib / .so
+    make build-lib
+
+    # Install Python package with CLI entry point
+    make python-install
+    ```
+
+    ### 2. Validate Media Assets
+    Run the `credentio validate` command:
+
+    ```bash
+    credentio validate image_signed.jpg
+    ```
+
+    **Example Output:**
+    ```text
+    ================================================================
+      Google Credentio C2PA Validation Report
+    ================================================================
+    Asset:       image_signed.jpg (0.85 MB, image/jpeg)
+    Path:        /Users/username/image_signed.jpg
+    Status:      SIGNED
+    Generator:   CredentioCamera 1.4
+    Issuer:      Google Trust Services LLC
+    Format/Spec: image/jpeg (C2PA 2.2)
+    Assertions:  3 attached
+    Statuses:    1 reported
+    Core Time:   3.12 ms
+    Wall Time:   4.58 ms
+    ================================================================
+    ```
+
+    ### 3. Structured JSON for CI & Scripting
+    Pass `--json` to output machine-readable payloads:
+
+    ```bash
+    credentio validate image_signed.jpg --json
+    ```
+  </TabItem>
+
+  <TabItem label="Go" icon="seti:go">
+    ### 1. Build Native Library & Compile Go Binary
+    ```bash
+    # Build libcredentio_c.dylib / .so
+    make build-lib
+
+    # Build the standalone Go executable
+    cd go && go build -o ../bin/credentio ./cmd/credentio && cd ..
+    ```
+
+    ### 2. Validate Media Assets
+    Run the compiled binary:
+
+    ```bash
+    ./bin/credentio validate image_signed.jpg
+    ```
+
+    **Example Output:**
+    ```text
+    ================================================================
+      Google Credentio C2PA Validation Report
+    ================================================================
+    Asset:       image_signed.jpg (0.85 MB, image/jpeg)
+    Path:        /Users/username/image_signed.jpg
+    Status:      SIGNED
+    Generator:   CredentioCamera 1.4
+    Issuer:      Google Trust Services LLC
+    Format/Spec: image/jpeg (C2PA 2.2)
+    Assertions:  3 attached
+    Statuses:    1 reported
+    Core Time:   3.25 ms
+    Wall Time:   3.80 ms
+    ================================================================
+    ```
+
+    ### 3. Structured JSON Output
+    Pass `-json` for scripting:
+
+    ```bash
+    ./bin/credentio validate image_signed.jpg -json
+    ```
+  </TabItem>
+
+  <TabItem label="Swift" icon="apple">
+    ### 1. Build Static XCFramework
+    ```bash
+    # Build CredentioC.xcframework
+    make build-swift
+    ```
+
+    ### 2. Run the Swift CLI
+    Run the executable target via Swift Package Manager:
+
+    ```bash
+    cd swift && swift run credentio-cli validate ../image_signed.jpg
+    ```
+
+    **Example Output:**
+    ```text
+    ================================================================
+      Google Credentio C2PA Validation Report
+    ================================================================
+    Asset:       image_signed.jpg (0.85 MB, image/jpeg)
+    Path:        /Users/username/image_signed.jpg
+    Status:      SIGNED
+    Generator:   CredentioCamera 1.4
+    Issuer:      Google Trust Services LLC
+    Format/Spec: image/jpeg (C2PA 2.2)
+    Assertions:  3 attached
+    Statuses:    1 reported
+    Core Time:   3.10 ms
+    Wall Time:   3.95 ms
+    ================================================================
+    ```
+
+    ### 3. Structured JSON Output
+    Pass `--json` to output full manifest structures:
+
+    ```bash
+    swift run credentio-cli validate ../image_signed.jpg --json
+    ```
+  </TabItem>
+</Tabs>
+
+---
+
+## 3. Standard Exit Codes
+
+All three command-line tools implement standard Unix exit codes for shell scripting and CI automation:
+
+| Exit Code | Meaning | Shell Status |
+| :---: | :--- | :--- |
+| **`0`** | **`SIGNED`** | Valid C2PA credentials found and verified. |
+| **`1`** | **`UNSIGNED`** | Media asset is authentic but has no C2PA manifest attached. |
+| **`2`** | **`INVALID`** | C2PA manifest found, but validation reported one or more integrity/signature errors. |
+| **`3+`** | **`ERROR`** | Missing file, invalid command arguments, or internal engine failure. |
+
+### Shell Scripting Example
+```bash
+credentio validate upload.jpg --json > result.json
+EXIT_CODE=$?
+
+if [ $EXIT_CODE -eq 0 ]; then
+  echo "Asset has verified C2PA Content Credentials!"
+elif [ $EXIT_CODE -eq 1 ]; then
+  echo "Asset has no C2PA credentials."
+elif [ $EXIT_CODE -eq 2 ]; then
+  echo "WARNING: Asset failed C2PA validation checks!"
+else
+  echo "Validation failed with execution error."
+fi
+```

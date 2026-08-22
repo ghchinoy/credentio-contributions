@@ -180,6 +180,25 @@ make swift-test
 
 ---
 
+### Step 5: Command-Line Interface (CLI)
+
+Each language provides a standalone command-line validator implementing standard exit codes (`0=Signed`, `1=Unsigned`, `2=Invalid`):
+
+```bash
+# Python CLI:
+credentio validate photo.jpg [--json]
+
+# Go CLI:
+./bin/credentio validate photo.jpg [-json]
+
+# Swift CLI:
+cd swift && swift run credentio-cli validate ../photo.jpg [--json]
+```
+
+See the [CLI Tutorial](https://ghchinoy.github.io/credentio-contributions/cli/) for a complete hands-on guide.
+
+---
+
 ## Distribution Status
 
 Packages in this repository are currently distributed as **source distributions built against local Credentio checkouts**. 

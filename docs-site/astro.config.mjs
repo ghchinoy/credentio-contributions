@@ -34,6 +34,12 @@ export default defineConfig({
 					],
 				},
 				{
+					label: 'Command-Line Tools',
+					items: [
+						{ label: 'CLI Tutorial', slug: 'cli' },
+					],
+				},
+				{
 					label: 'Language Bindings',
 					items: [
 						{ label: 'Python (credentio)', slug: 'python' },
