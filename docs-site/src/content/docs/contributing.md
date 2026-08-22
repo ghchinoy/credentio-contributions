@@ -5,7 +5,7 @@ description: How to contribute to this project and path toward upstreaming bindi
 
 We welcome contributions, bug reports, and optimizations for the Python, Go, and Swift Credentio bindings!
 
-Please review our root [Contributing Guidelines](https://github.com/google/credentio-contributions/blob/main/CONTRIBUTING.md) and [Code of Conduct](https://github.com/google/credentio-contributions/blob/main/CODE_OF_CONDUCT.md).
+Please review our root [Contributing Guidelines](https://github.com/ghchinoy/credentio-contributions/blob/main/CONTRIBUTING.md) and [Code of Conduct](https://github.com/ghchinoy/credentio-contributions/blob/main/CODE_OF_CONDUCT.md).
 
 ---
 

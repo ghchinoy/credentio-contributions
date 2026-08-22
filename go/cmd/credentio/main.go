@@ -22,7 +22,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/google/credentio/go"
+	"github.com/ghchinoy/credentio-contributions/go"
 )
 
 const version = "0.1.0"

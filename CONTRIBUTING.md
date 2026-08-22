@@ -21,7 +21,7 @@ All contributors and maintainers are expected to follow our [Code of Conduct](CO
    ```
 2. Clone this repository:
    ```bash
-   git clone https://github.com/google/credentio-contributions.git
+   git clone https://github.com/ghchinoy/credentio-contributions.git
    cd credentio-contributions
    ```
 3. Compile the native libraries:

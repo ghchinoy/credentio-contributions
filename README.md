@@ -31,7 +31,7 @@ Idiomatic, high-performance **Python**, **Go**, and **Swift** bindings for [Goog
 This repository provides language bindings built on top of a unified C-ABI bridge (`libcredentio_c` / `CredentioC.xcframework`), bringing sub-millisecond local provenance validation to:
 
 - 🐍 **Python (`credentio`)**: `cffi`-based library with typed dataclasses, context managers, and zero runtime dependencies.
-- 🐹 **Go (`github.com/google/credentio/go`)**: `cgo`-based package with thread-safe validators, `encoding/json` models, and functional options.
+- 🐹 **Go (`github.com/ghchinoy/credentio-contributions/go`)**: `cgo`-based package with thread-safe validators, `encoding/json` models, and functional options.
 - 🍏 **Swift (`CredentioKit`)**: Actor-isolated Swift 6 package for macOS 14+ and iOS 16+ via a native static XCFramework.
 
 ---
@@ -62,7 +62,7 @@ git checkout 4ac69fc58256d3871e765f615254373e19e250e9
 cd ..
 
 # 2. Clone Credentio Contributions:
-git clone https://github.com/google/credentio-contributions.git
+git clone https://github.com/ghchinoy/credentio-contributions.git
 cd credentio-contributions
 ```
 
@@ -122,7 +122,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/google/credentio/go"
+	"github.com/ghchinoy/credentio-contributions/go"
 )
 
 func main() {

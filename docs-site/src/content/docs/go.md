@@ -1,9 +1,9 @@
 ---
 title: Go Package Reference
-description: API documentation and usage patterns for the github.com/google/credentio/go package.
+description: API documentation and usage patterns for the github.com/ghchinoy/credentio-contributions/go package.
 ---
 
-The `github.com/google/credentio/go` package provides native `cgo` bindings for Google Credentio.
+The `github.com/ghchinoy/credentio-contributions/go` package provides native `cgo` bindings for Google Credentio.
 
 ---
 
@@ -13,7 +13,7 @@ The `github.com/google/credentio/go` package provides native `cgo` bindings for 
 Creates and initializes an in-process Credentio validator. `Validator` instances are protected by an internal mutex and are safe to call concurrently from multiple goroutines.
 
 ```go
-import "github.com/google/credentio/go"
+import "github.com/ghchinoy/credentio-contributions/go"
 
 // Initialize with test configuration
 validator, err := credentio.NewValidator(

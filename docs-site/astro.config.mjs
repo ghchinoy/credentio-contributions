@@ -44,7 +44,7 @@ export default defineConfig({
 					label: 'Language Bindings',
 					items: [
 						{ label: 'Python (credentio)', slug: 'python' },
-						{ label: 'Go (github.com/google/credentio/go)', slug: 'go' },
+						{ label: 'Go (credentio/go)', slug: 'go' },
 						{ label: 'Swift (CredentioKit)', slug: 'swift' },
 					],
 				},

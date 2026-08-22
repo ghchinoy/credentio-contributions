@@ -31,7 +31,7 @@ git checkout 4ac69fc58256d3871e765f615254373e19e250e9
 cd ..
 
 # 2. Clone Credentio Contributions:
-git clone https://github.com/google/credentio-contributions.git
+git clone https://github.com/ghchinoy/credentio-contributions.git
 cd credentio-contributions
 ```
 
@@ -94,7 +94,7 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/google/credentio/go"
+	"github.com/ghchinoy/credentio-contributions/go"
 )
 
 func main() {
