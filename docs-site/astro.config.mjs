@@ -1,15 +1,28 @@
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
+import catppuccin from '@catppuccin/starlight';
 
 // https://astro.build/config
 export default defineConfig({
+	site: 'https://ghchinoy.github.io',
+	base: '/credentio-contributions',
 	integrations: [
 		starlight({
 			title: 'Credentio Contributions',
-			description: 'Idiomatic Python and Go bindings for Google Credentio C2PA Content Credentials validator',
-			social: {
-				github: 'https://mediaprovenance.googlesource.com/credentio/',
-			},
+			description: 'Idiomatic Python, Go, and Swift bindings for Google Credentio C2PA Content Credentials validator',
+			plugins: [
+				catppuccin({
+					dark: { flavor: 'mocha', accent: 'sky' },
+					light: { flavor: 'latte', accent: 'sky' },
+				}),
+			],
+			social: [
+				{
+					icon: 'github',
+					label: 'Google Credentio Source',
+					href: 'https://mediaprovenance.googlesource.com/credentio/',
+				},
+			],
 			sidebar: [
 				{
 					label: 'Overview',

@@ -73,7 +73,7 @@ This isolates the raw C++ cryptographic validation time from file I/O, Python/Go
 
 The Bazel build target:
 
-```bazel
+```python
 cc_binary(
     name = "libcredentio_c",
     deps = [":credentio_c"],
