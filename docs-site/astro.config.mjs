@@ -30,6 +30,7 @@ export default defineConfig({
 						{ label: 'Introduction', slug: 'index' },
 						{ label: 'Why Credentio Bindings?', slug: 'why' },
 						{ label: 'C2PA Core Concepts', slug: 'concepts' },
+						{ label: 'Trust Anchors & Validity', slug: 'trust' },
 						{ label: 'Quick Start', slug: 'getting-started' },
 					],
 				},

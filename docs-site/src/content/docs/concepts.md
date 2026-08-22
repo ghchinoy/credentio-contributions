@@ -51,16 +51,26 @@ The validation engine evaluates the manifest and emits structured status codes:
 
 ## 2. Trust Anchors & Trust Lists
 
-C2PA signatures use X.509 PKI certificates. By default, Credentio can evaluate structural validity without external anchors, but in production, signatures are validated against **Trust Anchor Lists**:
+C2PA signatures use standard X.509 PKI certificates. By default, Credentio evaluates cryptographic and hash validity locally without external network anchors.
 
+In production, validators check signatures against **Trust Anchor Lists**:
 1. **Claim Signer Trust Anchors:** Root and intermediate PEM certificates authorized to sign C2PA claims.
-2. **Time Stamping Authority (TSA) Trust Anchors:** PEM certificates from certified TSAs confirming the exact time of signature creation.
+2. **Time Stamping Authority (TSA) Trust Anchors:** Certificates for certified time-stamping authorities confirming signing time.
 
-Both the Python and Go bindings allow passing custom trust anchor PEM strings or files directly to the validator.
+See the [Trust Anchors & Validity Guide](/credentio-contributions/trust/) for a deep dive on why signatures show as `untrusted` out of the box and how to configure custom roots.
 
 ---
 
-## 3. Supported Media Formats
+## 3. Scope: Validation vs. Signing
+
+Google Credentio and this repository focus specifically on **high-performance local validation and inspection** of existing C2PA credentials.
+
+- **Validation (This Repository):** Reading, parsing, verifying cryptographic signatures, evaluating data hashes, and reporting granular provenance status.
+- **Authoring & Signing (Out of Scope):** Creating new C2PA manifests, generating digital signatures, and embedding claims into media files. For authoring workflows, consult the upstream C2PA specification and signing tools.
+
+---
+
+## 4. Supported Media Formats
 
 Credentio natively extracts and validates Content Credentials embedded within:
 
