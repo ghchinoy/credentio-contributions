@@ -1,6 +1,6 @@
 ---
 title: Why Credentio Bindings?
-description: Background, local-first design principles, and why Python and Go bindings were created.
+description: Background, local-first design principles, and why Python, Go, and Swift bindings were created.
 ---
 
 In August 2026, Google announced [Credentio on the Google Developers Blog](https://developers.googleblog.com/introducing-credentio-open-source-c-library-for-c2pa-content-credentials-from-google/), introducing an open-source C++ library designed for verifying [C2PA Content Credentials](https://c2pa.org/).
@@ -21,7 +21,7 @@ Most media verification tools rely on cloud APIs, which introduce network latenc
 
 ## Engineered for Low Memory Footprint
 
-Validating provenance records in large digital assets—such as multi-gigabyte video files or high-resolution imagery—often causes memory spikes in traditional validator libraries.
+Validating provenance records in large digital assets (such as multi-gigabyte video files or high-resolution imagery) often causes memory spikes in traditional validator libraries.
 
 Credentio was engineered specifically to solve this problem:
 - Streams data through efficient readers (`riegeli`).
@@ -30,26 +30,27 @@ Credentio was engineered specifically to solve this problem:
 
 ---
 
-## Why Build Python and Go Bindings?
+## Why Build Python, Go, and Swift Bindings?
 
-While Credentio's core is written in C++20, modern media processing pipelines, backend microservices, and AI data engineering workflows are largely written in **Python** and **Go**:
+While Credentio's core is written in C++20, modern media processing pipelines, backend microservices, AI workflows, and native client applications are largely written in **Python**, **Go**, and **Swift**:
 
 | Workflow | Language | Need |
 | :--- | :--- | :--- |
 | **AI Data Pipelines & ML Inference** | Python | Fast verification of training datasets and generated assets using NumPy/PyTorch. |
 | **Cloud Microservices & APIs** | Go | Low-latency HTTP/gRPC middleware inspecting incoming media uploads. |
+| **Native Apple Applications** | Swift | On-device C2PA verification in macOS and iOS applications with Swift 6 strict concurrency safety. |
 | **Batch Media Ingestion** | Python / Go | High-throughput concurrent validation across object storage buckets. |
 
 Without native bindings, developers were forced to either spawn command-line subprocesses (which incur a 50–100 ms startup overhead per file) or write complex custom C++ glue code.
 
 ### The Solution: A Unified C-ABI
 
-**Credentio Contributions** provides a single `extern "C"` ABI bridge (`libcredentio_c`) that compiles the entire C++ library into a monolithic shared library. 
+**Credentio Contributions** provides a single `extern "C"` ABI bridge (`libcredentio_c` / `CredentioC.xcframework`) that compiles the entire C++ library into a monolithic binary artifact. 
 
 This enables:
 - **In-process execution**: Core verification runs in **3 to 5 milliseconds** per asset instead of 100 ms over CLI subprocesses.
-- **Idiomatic APIs**: Python developers use typed dataclasses and context managers (`Validator`), while Go developers use standard structs and method receivers (`credentio.NewValidator`).
-- **Single maintenance surface**: Both bindings share the exact same underlying C-ABI and validation logic.
+- **Idiomatic APIs**: Python developers use typed dataclasses and context managers (`Validator`), Go developers use standard structs and method receivers (`credentio.NewValidator`), and Swift developers use actor-isolated engines (`CredentioNativeEngine`).
+- **Single maintenance surface**: All three bindings share the exact same underlying C-ABI and validation logic.
 
 ---
 
@@ -59,4 +60,4 @@ As noted in Google's original announcement:
 
 > *"We welcome contributions from the developer community! Whether you are interested in submitting bug fixes, adding new features, or optimizing performance, we invite developers, security researchers, and media ecosystem partners to collaborate with us and help shape the future of local C2PA validation."*
 
-This repository is designed to support the broader ecosystem by expanding Credentio's reach into Python and Go.
+This repository is designed to support the broader ecosystem by expanding Credentio's reach into Python, Go, and Swift.
