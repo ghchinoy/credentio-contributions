@@ -58,6 +58,16 @@ public struct CredentioCLIEngine: ProvenanceEngine {
             return auxURL
         }
 
+        // Check system $PATH environment variable
+        if let envPath = ProcessInfo.processInfo.environment["PATH"] {
+            for dir in envPath.split(separator: ":") {
+                let candidate = URL(fileURLWithPath: String(dir)).appendingPathComponent("c2pa_validate")
+                if FileManager.default.isExecutableFile(atPath: candidate.path) {
+                    return candidate
+                }
+            }
+        }
+
         // Check common host and development locations
         let candidatePaths = [
             "/opt/homebrew/bin/c2pa_validate",
