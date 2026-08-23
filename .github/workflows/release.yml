@@ -173,7 +173,7 @@ jobs:
           prerelease: ${{ steps.prerelease_check.outputs.is_prerelease == 'true' }}
 
       - name: Publish to PyPI
-        if: ${{ (github.event_name == 'push' && steps.prerelease_check.outputs.is_prerelease == 'false') || github.event.inputs.publish_pypi == true }}
+        if: ${{ (github.event_name == 'push' && steps.prerelease_check.outputs.is_prerelease == 'false') || github.event.inputs.publish_pypi == 'true' }}
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: dist-release/
