@@ -14,13 +14,11 @@
 
 import Foundation
 
-/// Maps Credentio's "crjson" output format into an engine-agnostic `ProvenanceReport`.
+/// Maps Credentio's "crjson" and c2patool manifest store format into an engine-agnostic `ProvenanceReport`.
 ///
-/// Credentio emits a JSON structure where:
-/// - `manifests` is an Array of manifest dictionaries
-/// - `assertions` is an Object keyed by assertion label (e.g. `assertions["c2pa.actions"]`)
-/// - `claim` holds `claim_generator_info`, `signature_info`, `instanceID`, etc.
-/// - `validation` holds validation statuses
+/// Supports both:
+/// - Credentio format: Array of manifest dictionaries with nested validation statuses
+/// - c2patool format: Dictionary of manifests with `active_manifest` key and root-level validation statuses
 public enum CredentioCrjsonMapper {
 
     /// Maps raw crjson string into a `ProvenanceReport`.
@@ -55,7 +53,7 @@ public enum CredentioCrjsonMapper {
                 manifests.append(mapManifest(dict: dict, defaultLabel: "manifest_\(index)"))
             }
         } else if let manifestsDict = root["manifests"] as? [String: Any] {
-            // In case crjson structure is an object keyed by label
+            // c2patool / manifest-store structure: object keyed by label
             for (label, value) in manifestsDict {
                 if let dict = value as? [String: Any] {
                     manifests.append(mapManifest(dict: dict, defaultLabel: label))
@@ -63,8 +61,30 @@ public enum CredentioCrjsonMapper {
             }
         }
 
-        let active = manifests.first
-        let ingredients = manifests.count > 1 ? Array(manifests.dropFirst()) : []
+        // Support active_manifest key pointing to specific manifest label (c2patool format)
+        let activeLabel = root["active_manifest"] as? String
+        var active: Manifest?
+        var ingredients: [Manifest] = []
+
+        if let activeLabel, let matched = manifests.first(where: { $0.label == activeLabel }) {
+            active = matched
+            ingredients = manifests.filter { $0.label != activeLabel }
+        } else {
+            active = manifests.first
+            ingredients = manifests.count > 1 ? Array(manifests.dropFirst()) : []
+        }
+
+        // Fall back to root-level validation_status if active manifest has none nested
+        if var activeManifest = active {
+            if activeManifest.validationStatuses.isEmpty {
+                let rootStatuses = (root["validation_status"] as? [[String: Any]])
+                    ?? ((root["validation_results"] as? [String: Any])?["validation_status"] as? [[String: Any]])
+                if let rootStatuses {
+                    activeManifest.validationStatuses = mapValidationStatuses(rootStatuses)
+                    active = activeManifest
+                }
+            }
+        }
 
         let validationResults = root["validation_results"] as? [String: Any]
         let specVersion = root["spec_version"] as? String
@@ -112,7 +132,7 @@ public enum CredentioCrjsonMapper {
             ?? (claimDict?["signature"] as? [String: Any])
         let signature = mapSignature(sigDict)
 
-        // Assertions extraction: in crjson, assertions is an object keyed by label
+        // Assertions extraction
         var assertions: [Assertion] = []
         if let assertionsDict = dict["assertions"] as? [String: Any] {
             for (assertionLabel, assertionValue) in assertionsDict {
@@ -191,6 +211,8 @@ public enum CredentioCrjsonMapper {
 
     private static func severity(forCode code: String) -> ValidationStatus.Severity {
         let lowered = code.lowercased()
+        // Note: 'untrusted' is currently classified as .error.
+        // Reclassifying 'signingCredential.untrusted' to .warning is tracked as a policy decision in issue #6.
         if lowered.contains("not")
             || lowered.contains("invalid")
             || lowered.contains("mismatch")

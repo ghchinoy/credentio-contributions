@@ -109,6 +109,59 @@ final class CredentioCrjsonMapperTests: XCTestCase {
         XCTAssertEqual(actions?.summary, "c2pa.color_adjustments")
     }
 
+    func testC2paToolFormatMapping() {
+        let sampleC2paToolJson = """
+        {
+            "active_manifest": "contentauth:urn:uuid:5a08e472-active",
+            "manifests": {
+                "contentauth:urn:uuid:5a08e472-ingredient": {
+                    "label": "contentauth:urn:uuid:5a08e472-ingredient",
+                    "title": "Source Ingredient Asset",
+                    "format": "image/png"
+                },
+                "contentauth:urn:uuid:5a08e472-active": {
+                    "label": "contentauth:urn:uuid:5a08e472-active",
+                    "title": "Active Composite Asset",
+                    "format": "image/jpeg",
+                    "claim": {
+                        "claim_generator": "c2patool 0.9.0",
+                        "signature_info": {
+                            "issuer": "Test Signer CA",
+                            "alg": "es256"
+                        }
+                    }
+                }
+            },
+            "validation_status": [
+                {
+                    "code": "claimSignature.validated",
+                    "explanation": "Claim signature verified."
+                }
+            ]
+        }
+        """
+
+        let report = CredentioCrjsonMapper.mapReport(
+            json: sampleC2paToolJson,
+            mediaType: "image/jpeg",
+            elapsed: .milliseconds(8),
+            engineID: "rust-cli",
+            engineName: "c2patool (Rust CLI)"
+        )
+
+        XCTAssertTrue(report.hasCredentials)
+        XCTAssertEqual(report.badge, .signed)
+        XCTAssertEqual(report.activeManifest?.label, "contentauth:urn:uuid:5a08e472-active")
+        XCTAssertEqual(report.activeManifest?.title, "Active Composite Asset")
+        XCTAssertEqual(report.activeManifest?.claimGenerator, "c2patool 0.9.0")
+        XCTAssertEqual(report.activeManifest?.signature?.issuer, "Test Signer CA")
+        XCTAssertEqual(report.activeManifest?.validationStatuses.count, 1)
+        XCTAssertEqual(report.activeManifest?.validationStatuses.first?.code, "claimSignature.validated")
+
+        XCTAssertEqual(report.ingredientManifests.count, 1)
+        XCTAssertEqual(report.ingredientManifests.first?.label, "contentauth:urn:uuid:5a08e472-ingredient")
+    }
+
     func testValidationSeverityBadgeRollup() {
         let validStatus = ValidationStatus(code: "claimSignature.validated", severity: .info)
         let manifestOk = Manifest(label: "ok", validationStatuses: [validStatus])
