@@ -20,9 +20,16 @@ var credentioKitDeps: [Target.Dependency] = []
 var credentioKitLinkerSettings: [LinkerSetting] = []
 var extraTargets: [Target] = []
 
-// Dynamically link native CredentioC.xcframework if built on host
+// Dynamically link native CredentioC.xcframework:
+// 1. Local xcframework if built on host (development mode)
+// 2. Remote GitHub Release binaryTarget for standalone SwiftPM consumers
 let packageDir = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
 let nativeXcframeworkURL = packageDir.appendingPathComponent("CredentioC.xcframework")
+
+// Prebuilt binary distribution release metadata
+let releaseVersion = "0.1.0"
+let remoteChecksum = "PLACEHOLDER_CHECKSUM"
+let remoteURL = "https://github.com/ghchinoy/credentio-contributions/releases/download/v\(releaseVersion)/CredentioC.xcframework.zip"
 
 if FileManager.default.fileExists(atPath: nativeXcframeworkURL.path) {
     credentioKitDeps.append("CredentioC")
@@ -31,6 +38,16 @@ if FileManager.default.fileExists(atPath: nativeXcframeworkURL.path) {
         .binaryTarget(
             name: "CredentioC",
             path: "CredentioC.xcframework"
+        )
+    )
+} else if ProcessInfo.processInfo.environment["CREDENTIO_SOURCE_ONLY"] == nil && remoteChecksum != "PLACEHOLDER_CHECKSUM" {
+    credentioKitDeps.append("CredentioC")
+    credentioKitLinkerSettings.append(.linkedLibrary("c++"))
+    extraTargets.append(
+        .binaryTarget(
+            name: "CredentioC",
+            url: remoteURL,
+            checksum: remoteChecksum
         )
     )
 }

@@ -42,7 +42,7 @@ credentio = "credentio.cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-credentio = ["lib/*", "include/*"]
+credentio = ["lib/*", "include/*", "LICENSE*"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

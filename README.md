@@ -201,9 +201,11 @@ See the [CLI Tutorial](https://ghchinoy.github.io/credentio-contributions/cli/) 
 
 ## Distribution Status
 
-Packages in this repository are currently distributed as **source distributions built against local Credentio checkouts**. 
+Pre-compiled binary releases and source packages are distributed across multiple package ecosystems:
 
-Pre-compiled binary wheels for PyPI and registered modules for package registries are planned for future releases as the upstream C2PA C-ABI stabilizes.
+- **Swift (CredentioKit):** Swift Package Manager remote binary package linking pre-compiled `CredentioC.xcframework` (macOS and iOS) from GitHub Releases.
+- **Python (credentio):** Binary wheels on PyPI and GitHub Releases with pre-bundled native shared libraries for macOS and Linux.
+- **Go:** Standard Go module with automated prebuilt library download via `make fetch-lib` or direct compilation against native libraries.
 
 ---
 
@@ -215,8 +217,8 @@ This project includes an interactive [Astro Starlight](https://starlight.astro.b
 make docs-serve
 ```
 
-- [Developer Guide](docs/developers_guide.md) — Comprehensive guide to the C-ABI bridge, XCFramework build, and architecture.
-- [ADR-0001: Shared C-ABI Strategy](docs/adr/0001-shared-c-abi-bindings.md) — Architectural decision record for multi-language FFI.
+- [Developer Guide](docs/developers_guide.md): Comprehensive guide to the C-ABI bridge, XCFramework build, and architecture.
+- [ADR-0001: Shared C-ABI Strategy](docs/adr/0001-shared-c-abi-bindings.md): Architectural decision record for multi-language FFI.
 
 ---
 

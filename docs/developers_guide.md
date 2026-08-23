@@ -1,4 +1,4 @@
-# Developer Guide — Credentio Python, Go, and Swift Bindings
+# Developer Guide: Credentio Python, Go, and Swift Bindings
 
 This guide details the internal architecture, C-ABI interface, upstream Credentio setup, build workflows, and packaging for the Python, Go, and Swift bindings of Google Credentio.
 

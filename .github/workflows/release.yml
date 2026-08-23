@@ -1,0 +1,156 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  id-token: write # Required for PyPI Trusted Publishing
+
+jobs:
+  build-swift:
+    name: Build Swift XCFramework (macOS)
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Bazelisk
+        run: |
+          brew install bazelisk
+
+      - name: Select Xcode 16
+        run: |
+          sudo xcode-select -s /Applications/Xcode_16.app/Contents/Developer 2>/dev/null || \
+          sudo xcode-select -s /Applications/Xcode_16.0.app/Contents/Developer 2>/dev/null || \
+          sudo xcode-select -s /Applications/Xcode_16.1.app/Contents/Developer 2>/dev/null || \
+          sudo xcode-select -s /Applications/Xcode_16.2.app/Contents/Developer 2>/dev/null || true
+          swift --version
+
+      - name: Build and Package CredentioC.xcframework
+        env:
+          CREDENTIO_ZIP_RELEASE: "1"
+        run: |
+          ./scripts/build-swift-xcframework.sh --zip
+
+      - name: Upload Swift Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: swift-xcframework
+          path: |
+            swift/CredentioC.xcframework.zip
+            swift/CredentioC.xcframework.zip.sha256
+
+  build-native-and-wheels:
+    name: Build Native Libs & Wheels (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: macos-14
+            platform_tag: darwin-arm64
+            lib_name: libcredentio_c.dylib
+          - os: ubuntu-latest
+            platform_tag: linux-amd64
+            lib_name: libcredentio_c.so
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Bazel (macOS)
+        if: runner.os == 'macOS'
+        run: brew install bazelisk
+
+      - name: Set up Bazel (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update && sudo apt-get install -y wget
+          wget -q https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-linux-amd64 -O /usr/local/bin/bazel
+          chmod +x /usr/local/bin/bazel
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Build Native Shared Library
+        run: |
+          ./scripts/build-shared-lib.sh
+
+      - name: Stage named platform binary for release
+        run: |
+          mkdir -p release-libs
+          if [ -f "go/lib/${{ matrix.lib_name }}" ]; then
+            cp "go/lib/${{ matrix.lib_name }}" "release-libs/libcredentio_c-${{ matrix.platform_tag }}.${{ matrix.lib_name##*.}}"
+          fi
+
+      - name: Build Python Wheel
+        run: |
+          cd python
+          python -m pip install --upgrade pip build wheel
+          if [ "${{ runner.os }}" == "macOS" ]; then
+            pip install delocate
+            python -m build --wheel
+            delocate-wheel -v dist/*.whl || true
+          else
+            python -m build --wheel
+          fi
+
+      - name: Upload Native Libs
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-lib-${{ matrix.platform_tag }}
+          path: release-libs/*
+
+      - name: Upload Python Wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-wheels-${{ matrix.platform_tag }}
+          path: python/dist/*.whl
+
+  publish-release:
+    name: Create GitHub Release & Publish
+    needs: [build-swift, build-native-and-wheels]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Gather assets for release
+        run: |
+          mkdir -p dist-release
+          find artifacts/ -type f -exec cp {} dist-release/ \;
+          ls -la dist-release/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist-release/*
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist-release/
+          skip-existing: true
+        continue-on-error: true

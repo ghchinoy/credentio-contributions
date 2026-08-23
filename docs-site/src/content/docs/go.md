@@ -7,7 +7,25 @@ The `github.com/ghchinoy/credentio-contributions/go` package provides native `cg
 
 ---
 
-## 1. The `Validator` Type
+## 1. Installation & Native Library Setup
+
+Because Go interacts with Credentio via `cgo`, the package requires `libcredentio_c.dylib` (macOS) or `libcredentio_c.so` (Linux).
+
+You can install the prebuilt native library automatically:
+
+```bash
+make fetch-lib
+```
+
+Or compile the native library from source using Bazel:
+
+```bash
+make build-lib
+```
+
+---
+
+## 2. The `Validator` Type
 
 ### `NewValidator(opts ...Option) (*Validator, error)`
 Creates and initializes an in-process Credentio validator. `Validator` instances are protected by an internal mutex and are safe to call concurrently from multiple goroutines.
@@ -58,7 +76,7 @@ Releases the underlying C-ABI validator memory.
 
 ---
 
-## 2. Struct Definitions
+## 3. Struct Definitions
 
 ### `ProvenanceReport`
 ```go
@@ -104,7 +122,7 @@ type SignatureInfo struct {
 
 ---
 
-## 3. Standalone crJSON Parser
+## 4. Standalone crJSON Parser
 
 If you already have raw crJSON strings produced by Credentio's CLI (`c2pa_validate`) or another source, you can deserialize them into a typed `ProvenanceReport` without invoking `cgo`:
 

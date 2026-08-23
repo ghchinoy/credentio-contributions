@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# build-shared-lib.sh — builds libcredentio_c shared library (.dylib or .so)
+# build-shared-lib.sh: builds libcredentio_c shared library (.dylib or .so)
 # via Bazel and bundles it for the Python (cffi) and Go (cgo) packages.
 
 set -euo pipefail

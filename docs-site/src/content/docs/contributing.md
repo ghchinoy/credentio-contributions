@@ -34,9 +34,9 @@ Google Credentio is maintained at [mediaprovenance.googlesource.com/credentio](h
 The C-ABI layer (`native/credentio_c.{h,cc}`) was engineered to cleanly drop directly into Credentio's upstream repository under a `bindings/` or `bindings_c/` directory.
 
 ### Structure for Upstream Consideration:
-- `bindings_c/credentio_c.h` — Pure C header with default visibility exports.
-- `bindings_c/credentio_c.cc` — In-process C++ bridge with `CFileReader` and `StringReader`.
-- `bindings_c/BUILD` — Standard Bazel rules (`cc_library` and `cc_binary(linkshared=True)`).
+- `bindings_c/credentio_c.h`: Pure C header with default visibility exports.
+- `bindings_c/credentio_c.cc`: In-process C++ bridge with `CFileReader` and `StringReader`.
+- `bindings_c/BUILD`: Standard Bazel rules (`cc_library` and `cc_binary(linkshared=True)`).
 
 ---
 

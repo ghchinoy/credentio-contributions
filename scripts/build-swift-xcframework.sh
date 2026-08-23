@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# build-swift-xcframework.sh — builds the Credentio C-ABI static library
+# build-swift-xcframework.sh: builds the Credentio C-ABI static library
 # and packages it into swift/CredentioC.xcframework for native Swift consumption.
 #
 # Must be executed on macOS host with Xcode and Bazel installed.

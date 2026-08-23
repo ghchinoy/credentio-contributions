@@ -9,32 +9,30 @@ description: API documentation and usage patterns for the CredentioKit Swift pac
 
 ## 1. Installation
 
-### Step 1: Compile the Native XCFramework
-`CredentioKit` uses `CredentioC.xcframework` (a static C-ABI archive) to execute Credentio directly in-process with zero subprocess overhead.
+### Remote Package Dependency (Recommended)
 
-Compile the static XCFramework from the repository root on macOS:
-
-```bash
-make build-swift
-```
-
-### Step 2: Add Local Package Dependency
-`CredentioKit` is currently distributed as a local package built from source (remote registry releases with pre-compiled XCFrameworks are planned for future releases).
-
-Reference the local package directory in your `Package.swift`:
+Add `CredentioKit` to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(path: "../credentio-contributions/swift")
+    .package(url: "https://github.com/ghchinoy/credentio-contributions.git", from: "0.1.0")
 ],
 targets: [
     .target(
         name: "MyAppleApp",
         dependencies: [
-            .product(name: "CredentioKit", package: "swift")
+            .product(name: "CredentioKit", package: "credentio-contributions")
         ]
     )
 ]
+```
+
+### Local Source Build
+
+`CredentioKit` can also link a locally built `CredentioC.xcframework` directly. Compile the static XCFramework from the repository root on macOS:
+
+```bash
+make build-swift
 ```
 
 ---

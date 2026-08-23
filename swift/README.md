@@ -16,30 +16,30 @@ High-performance native Swift bindings for [Google Credentio](https://mediaprove
 
 ## ⚡ Quick Start
 
-### 1. Build Native Credentio Static XCFramework
-From the repository root on macOS:
+### 1. Add to Swift Package Manager
 
-```bash
-make build-swift
-```
-
-### 2. Add to Swift Package Manager
-`CredentioKit` is currently distributed as a local package built from source (remote registry releases with pre-compiled XCFrameworks are planned for future releases).
-
-After running `make build-swift`, reference the local package directory in your `Package.swift`:
+Add `CredentioKit` to your dependencies in `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(path: "../credentio-contributions/swift")
+    .package(url: "https://github.com/ghchinoy/credentio-contributions.git", from: "0.1.0")
 ],
 targets: [
     .target(
         name: "MyApp",
         dependencies: [
-            .product(name: "CredentioKit", package: "swift")
+            .product(name: "CredentioKit", package: "credentio-contributions")
         ]
     )
 ]
+```
+
+### 2. Local Source Build (Optional)
+
+To compile the static XCFramework locally from Google Credentio source:
+
+```bash
+make build-swift
 ```
 
 ---
