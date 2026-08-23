@@ -47,7 +47,7 @@ struct Validate: AsyncParsableCommand {
     @Option(name: .customLong("tsa-trust"), help: "Path to TSA trust anchors PEM")
     var tsaTrust: String?
 
-    @Flag(name: .customLong("skip-trust-checks"), help: "Skip certificate trust checks")
+    @Flag(name: .customLong("skip-trust-checks"), inversion: .prefixedNo, help: "Skip certificate trust checks")
     var skipTrustChecks: Bool = true
 
     func run() async throws {
