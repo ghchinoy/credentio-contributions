@@ -42,9 +42,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Bazelisk
-        run: |
-          brew install bazelisk
+      - name: Set up Bazel
+        uses: bazel-contrib/setup-bazel@0.15.0
+        with:
+          bazelisk-cache: true
+          disk-cache: true
 
       - name: Select Xcode 16
         run: |
@@ -72,6 +74,7 @@ jobs:
     name: Build Native Libs & Wheels (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: macos-14
@@ -87,16 +90,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Bazel (macOS)
-        if: runner.os == 'macOS'
-        run: brew install bazelisk
-
-      - name: Set up Bazel (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update && sudo apt-get install -y wget
-          wget -q https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-linux-amd64 -O /usr/local/bin/bazel
-          chmod +x /usr/local/bin/bazel
+      - name: Set up Bazel
+        uses: bazel-contrib/setup-bazel@0.15.0
+        with:
+          bazelisk-cache: true
+          disk-cache: true
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -123,6 +121,12 @@ jobs:
           CIBW_ARCHS: ${{ matrix.cibw_archs }}
           CIBW_BUILD: "cp39-* cp310-* cp311-* cp312-*"
           CIBW_SKIP: "*-musllinux_*"
+          CIBW_BEFORE_ALL_LINUX: >
+            curl -sLo /usr/local/bin/bazel https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-linux-amd64 &&
+            chmod +x /usr/local/bin/bazel &&
+            ./scripts/build-shared-lib.sh
+          CIBW_BEFORE_ALL_MACOS: ./scripts/build-shared-lib.sh
+          CIBW_ENVIRONMENT: "CREDENTIO_GIT_URL=https://mediaprovenance.googlesource.com/credentio CREDENTIO_SHA=4ac69fc58256d3871e765f615254373e19e250e9"
 
       - name: Upload Native Libs
         uses: actions/upload-artifact@v4

@@ -80,7 +80,7 @@ build_static_archive() {
   local extra_flags="${2:-}"
   local out_file="${STAGE_DIR}/libCredentioC_${label}.a"
 
-  echo "==> Building static archive for ${label} with Bazel (flags: ${extra_flags})..."
+  echo "==> Building static archive for ${label} with Bazel (flags: ${extra_flags})..." >&2
   # shellcheck disable=SC2086
   (
     cd "${CREDENTIO_DIR}"
@@ -128,7 +128,7 @@ build_static_archive() {
 
   local count
   count="$(wc -l < "${archive_list}" | tr -d ' ')"
-  echo "==> Found ${count} static archive(s) for ${label}."
+  echo "==> Found ${count} static archive(s) for ${label}." >&2
   if [[ "${count}" -eq 0 ]]; then
     echo "ERROR: Could not resolve static archives for ${label}." >&2
     return 1
