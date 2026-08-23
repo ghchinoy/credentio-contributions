@@ -107,3 +107,101 @@ func TestParseCrJSON(t *testing.T) {
 		t.Errorf("expected severity info, got %s", manifest.ValidationStatuses[0].Severity)
 	}
 }
+
+func TestParseCrJSON_V2SchemaAndToolkitFormat(t *testing.T) {
+	const sampleV2JSON = `
+	{
+		"manifests": [
+			{
+				"label": "urn:uuid:google-c2pa-v2-sample",
+				"title": "Google C2PA Core Generated Media",
+				"format": "image/webp",
+				"isUpdateManifest": false,
+				"claim.v2": {
+					"claim_generator_info": {
+						"name": "Google C2PA Core Generator",
+						"version": "2.1.0"
+					},
+					"signature_info": {
+						"certificateInfo": {
+							"issuer": {
+								"CN": "Google C2PA Intermediate CA"
+							},
+							"serialNumber": "112233445566"
+						},
+						"timeStampInfo": {
+							"timestamp": "2026-08-23T12:00:00Z"
+						},
+						"alg": "es256"
+					}
+				},
+				"assertions": {
+					"c2pa.actions.v2": {
+						"actions": [
+							{ "action": "c2pa.opened" }
+						]
+					}
+				},
+				"validationResults": {
+					"success": [
+						{
+							"code": "claimSignature.validated",
+							"explanation": "Signature verification succeeded."
+						}
+					],
+					"informational": [
+						{
+							"code": "signingCredential.trusted",
+							"explanation": "Certificate path is trusted."
+						}
+					]
+				}
+			}
+		],
+		"spec_version": "2.2"
+	}
+	`
+
+	report, err := ParseCrJSON(sampleV2JSON, "image/webp", 0.004, 0.002)
+	if err != nil {
+		t.Fatalf("unexpected error parsing v2 crJSON: %v", err)
+	}
+
+	if !report.HasCredentials {
+		t.Errorf("expected HasCredentials to be true")
+	}
+	if report.Badge() != BadgeSigned {
+		t.Errorf("expected badge to be %q, got %q", BadgeSigned, report.Badge())
+	}
+	if report.ActiveManifest == nil {
+		t.Fatalf("expected ActiveManifest not to be nil")
+	}
+
+	manifest := report.ActiveManifest
+	if manifest.Label != "urn:uuid:google-c2pa-v2-sample" {
+		t.Errorf("unexpected label: %s", manifest.Label)
+	}
+	if manifest.ClaimGenerator != "Google C2PA Core Generator 2.1.0" {
+		t.Errorf("unexpected claim generator: %s", manifest.ClaimGenerator)
+	}
+	if manifest.Signature == nil {
+		t.Fatalf("expected signature info not to be nil")
+	}
+	if manifest.Signature.Issuer != "Google C2PA Intermediate CA" {
+		t.Errorf("unexpected issuer: %s", manifest.Signature.Issuer)
+	}
+	if manifest.Signature.CertChainSummary != "112233445566" {
+		t.Errorf("unexpected serial number: %s", manifest.Signature.CertChainSummary)
+	}
+	if manifest.Signature.Time == nil {
+		t.Errorf("expected timestamp to be parsed from timeStampInfo")
+	}
+	if len(manifest.ValidationStatuses) != 2 {
+		t.Errorf("expected 2 validation statuses, got %d", len(manifest.ValidationStatuses))
+	}
+	for _, status := range manifest.ValidationStatuses {
+		if status.Severity != SeverityInfo {
+			t.Errorf("expected status %s to have info severity, got %s", status.Code, status.Severity)
+		}
+	}
+}
