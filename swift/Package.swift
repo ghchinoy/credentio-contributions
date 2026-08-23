@@ -21,10 +21,12 @@ var credentioKitLinkerSettings: [LinkerSetting] = []
 var extraTargets: [Target] = []
 
 // Dynamically link native CredentioC.xcframework:
-// 1. Local xcframework if built on host (development mode)
+// 1. Local xcframework if built on host or specified via CREDENTIO_C_XCFRAMEWORK_PATH
 // 2. Remote GitHub Release binaryTarget for standalone SwiftPM consumers
 let packageDir = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
-let nativeXcframeworkURL = packageDir.appendingPathComponent("CredentioC.xcframework")
+let customXCFPath = ProcessInfo.processInfo.environment["CREDENTIO_C_XCFRAMEWORK_PATH"]
+let nativeXcframeworkURL = customXCFPath.map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath) }
+    ?? packageDir.appendingPathComponent("CredentioC.xcframework")
 
 // Prebuilt binary distribution release metadata
 let releaseVersion = "0.1.0"
@@ -37,7 +39,7 @@ if FileManager.default.fileExists(atPath: nativeXcframeworkURL.path) {
     extraTargets.append(
         .binaryTarget(
             name: "CredentioC",
-            path: "CredentioC.xcframework"
+            path: nativeXcframeworkURL.path
         )
     )
 } else if ProcessInfo.processInfo.environment["CREDENTIO_SOURCE_ONLY"] == nil && remoteChecksum != "PLACEHOLDER_CHECKSUM" {
