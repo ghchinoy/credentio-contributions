@@ -221,4 +221,53 @@ final class CredentioCrjsonMapperTests: XCTestCase {
         XCTAssertFalse(invalidReport.isVerified)
         XCTAssertTrue(invalidReport.isInvalid)
     }
+
+    func testAssertionSummaries() {
+        let sampleJson = """
+        {
+            "manifests": [
+                {
+                    "label": "urn:c2pa:ai_sample",
+                    "assertions": {
+                        "c2pa.training-mining": {
+                            "entries": {
+                                "c2pa.ai_generative_training": { "use": "notAllowed" },
+                                "c2pa.data_mining": { "use": "notAllowed" }
+                            }
+                        },
+                        "c2pa.digital_source_type": {
+                            "digital_source_type": "http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia"
+                        },
+                        "c2pa.ai_generative_info": {
+                            "model": {
+                                "name": "Imagen",
+                                "version": "3.0"
+                            }
+                        }
+                    }
+                }
+            ]
+        }
+        """
+
+        let report = CredentioCrjsonMapper.mapReport(
+            json: sampleJson,
+            mediaType: "image/jpeg",
+            elapsed: .zero
+        )
+
+        guard let active = report.activeManifest else {
+            XCTFail("Missing active manifest")
+            return
+        }
+
+        let training = active.assertions.first(where: { $0.label == "c2pa.training-mining" })
+        XCTAssertEqual(training?.summary, "AI Training: ai_generative_training=notAllowed, data_mining=notAllowed")
+
+        let source = active.assertions.first(where: { $0.label == "c2pa.digital_source_type" })
+        XCTAssertEqual(source?.summary, "trainedAlgorithmicMedia")
+
+        let aiInfo = active.assertions.first(where: { $0.label == "c2pa.ai_generative_info" })
+        XCTAssertEqual(aiInfo?.summary, "model: Imagen 3.0")
+    }
 }

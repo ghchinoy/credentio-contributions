@@ -205,3 +205,68 @@ func TestParseCrJSON_V2SchemaAndToolkitFormat(t *testing.T) {
 		}
 	}
 }
+
+func TestAssertionSummaries(t *testing.T) {
+	const sampleJSON = `
+	{
+		"manifests": [
+			{
+				"label": "urn:c2pa:ai_sample",
+				"assertions": {
+					"c2pa.training-mining": {
+						"entries": {
+							"c2pa.ai_generative_training": { "use": "notAllowed" },
+							"c2pa.data_mining": { "use": "notAllowed" }
+						}
+					},
+					"c2pa.digital_source_type": {
+						"digital_source_type": "http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia"
+					},
+					"c2pa.ai_generative_info": {
+						"model": {
+							"name": "Imagen",
+							"version": "3.0"
+						}
+					}
+				}
+			}
+		]
+	}
+	`
+
+	report, err := ParseCrJSON(sampleJSON, "image/jpeg", 0.0, 0.0)
+	if err != nil {
+		t.Fatalf("unexpected error parsing crJSON: %v", err)
+	}
+
+	if report.ActiveManifest == nil {
+		t.Fatalf("expected ActiveManifest not to be nil")
+	}
+
+	active := report.ActiveManifest
+	var trainingSummary, sourceSummary, aiInfoSummary string
+	for _, a := range active.Assertions {
+		if a.Label == "c2pa.training-mining" {
+			trainingSummary = a.Summary
+		} else if a.Label == "c2pa.digital_source_type" {
+			sourceSummary = a.Summary
+		} else if a.Label == "c2pa.ai_generative_info" {
+			aiInfoSummary = a.Summary
+		}
+	}
+
+	expectedTraining := "AI Training: ai_generative_training=notAllowed, data_mining=notAllowed"
+	if trainingSummary != expectedTraining {
+		t.Errorf("expected training summary %q, got %q", expectedTraining, trainingSummary)
+	}
+
+	expectedSource := "trainedAlgorithmicMedia"
+	if sourceSummary != expectedSource {
+		t.Errorf("expected source summary %q, got %q", expectedSource, sourceSummary)
+	}
+
+	expectedAI := "model: Imagen 3.0"
+	if aiInfoSummary != expectedAI {
+		t.Errorf("expected AI info summary %q, got %q", expectedAI, aiInfoSummary)
+	}
+}

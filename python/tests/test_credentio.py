@@ -110,3 +110,41 @@ def test_native_validator_integration():
         report = val.validate_bytes(b"non-c2pa-dummy-file-content", media_type="image/jpeg")
         assert report.has_credentials is False
         assert report.badge == BadgeState.UNSIGNED
+
+
+def test_assertion_summaries():
+    sample_json = """
+    {
+        "manifests": [
+            {
+                "label": "urn:c2pa:ai_sample",
+                "assertions": {
+                    "c2pa.training-mining": {
+                        "entries": {
+                            "c2pa.ai_generative_training": { "use": "notAllowed" },
+                            "c2pa.data_mining": { "use": "notAllowed" }
+                        }
+                    },
+                    "c2pa.digital_source_type": {
+                        "digital_source_type": "http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia"
+                    },
+                    "c2pa.ai_generative_info": {
+                        "model": {
+                            "name": "Imagen",
+                            "version": "3.0"
+                        }
+                    }
+                }
+            }
+        ]
+    }
+    """
+    report = parse_crjson(raw_json=sample_json, media_type="image/jpeg")
+    assert report.active_manifest is not None
+    active = report.active_manifest
+
+    summaries = {a.label: a.summary for a in active.assertions}
+    assert summaries["c2pa.training-mining"] == "AI Training: ai_generative_training=notAllowed, data_mining=notAllowed"
+    assert summaries["c2pa.digital_source_type"] == "trainedAlgorithmicMedia"
+    assert summaries["c2pa.ai_generative_info"] == "model: Imagen 3.0"
+

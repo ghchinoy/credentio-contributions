@@ -187,13 +187,67 @@ public enum CredentioCrjsonMapper {
 
     private static func summarizeAssertion(label: String, value: Any) -> String? {
         guard let dict = value as? [String: Any] else { return nil }
+
+        // 1. Actions assertion
         if let actions = dict["actions"] as? [[String: Any]] {
             let names = actions.compactMap { $0["action"] as? String }
             if !names.isEmpty { return names.joined(separator: ", ") }
         }
+
+        // 2. Data hash assertion
         if let hashValue = dict["hash_value"] as? String {
             return "hash: \(hashValue.prefix(16))…"
         }
+
+        // 3. AI Training and Mining assertion
+        if label.contains("training-mining") || label.contains("data-mining") {
+            if let entries = dict["entries"] as? [String: Any] {
+                let formatted = entries.sorted(by: { $0.key < $1.key }).compactMap { key, val -> String? in
+                    let shortKey = key.replacingOccurrences(of: "c2pa.", with: "").replacingOccurrences(of: "cawg.", with: "")
+                    if let valDict = val as? [String: Any], let use = valDict["use"] as? String {
+                        return "\(shortKey)=\(use)"
+                    } else if let useStr = val as? String {
+                        return "\(shortKey)=\(useStr)"
+                    }
+                    return nil
+                }
+                if !formatted.isEmpty {
+                    return "AI Training: \(formatted.joined(separator: ", "))"
+                }
+            } else if let use = dict["use"] as? String {
+                return "AI Training: \(use)"
+            }
+        }
+
+        // 4. Digital Source Type assertion
+        if label.contains("digital_source_type") || label.contains("digitalSourceType") {
+            let typeVal = dict["digital_source_type"] as? String
+                ?? dict["digitalSourceType"] as? String
+                ?? dict["type"] as? String
+            if let typeVal {
+                let cleanType = typeVal.split(separator: "/").last.map(String.init) ?? typeVal
+                return cleanType
+            }
+        }
+
+        // 5. AI Generative Info assertion
+        if label.contains("generative") || label.contains("inference") {
+            if let modelDict = dict["model"] as? [String: Any] {
+                let name = modelDict["name"] as? String
+                let version = modelDict["version"] as? String
+                let modelStr = [name, version].compactMap { $0 }.joined(separator: " ")
+                if !modelStr.isEmpty {
+                    return "model: \(modelStr)"
+                }
+            }
+            if let modelName = dict["model_name"] as? String {
+                return "model: \(modelName)"
+            }
+            if let prompt = dict["prompt"] as? String {
+                return "prompt: \(prompt)"
+            }
+        }
+
         return nil
     }
 

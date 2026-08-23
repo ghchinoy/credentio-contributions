@@ -17,6 +17,7 @@ package credentio
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 )
@@ -412,26 +413,95 @@ func mapManifest(dict map[string]interface{}, defaultLabel string) Manifest {
 }
 
 func summarizeAssertion(label string, value interface{}) string {
-	if dict, ok := value.(map[string]interface{}); ok {
-		if actions, ok := dict["actions"].([]interface{}); ok {
-			var names []string
-			for _, item := range actions {
-				if aDict, ok := item.(map[string]interface{}); ok {
-					if act, ok := aDict["action"].(string); ok {
-						names = append(names, act)
-					}
+	dict, ok := value.(map[string]interface{})
+	if !ok {
+		return ""
+	}
+
+	// 1. Actions assertion
+	if actions, ok := dict["actions"].([]interface{}); ok {
+		var names []string
+		for _, item := range actions {
+			if aDict, ok := item.(map[string]interface{}); ok {
+				if act, ok := aDict["action"].(string); ok {
+					names = append(names, act)
 				}
 			}
-			if len(names) > 0 {
-				return strings.Join(names, ", ")
-			}
 		}
-		if hv, ok := dict["hash_value"].(string); ok {
-			if len(hv) > 16 {
-				return fmt.Sprintf("hash: %s…", hv[:16])
-			}
-			return fmt.Sprintf("hash: %s", hv)
+		if len(names) > 0 {
+			return strings.Join(names, ", ")
 		}
 	}
+
+	// 2. Data hash assertion
+	if hv, ok := dict["hash_value"].(string); ok {
+		if len(hv) > 16 {
+			return fmt.Sprintf("hash: %s…", hv[:16])
+		}
+		return fmt.Sprintf("hash: %s", hv)
+	}
+
+	// 3. AI Training and Mining assertion
+	if strings.Contains(label, "training-mining") || strings.Contains(label, "data-mining") {
+		if entries, ok := dict["entries"].(map[string]interface{}); ok {
+			var formatted []string
+			var keys []string
+			for k := range entries {
+				keys = append(keys, k)
+			}
+			sort.Strings(keys)
+			for _, k := range keys {
+				val := entries[k]
+				shortKey := strings.TrimPrefix(strings.TrimPrefix(k, "c2pa."), "cawg.")
+				if valDict, ok := val.(map[string]interface{}); ok {
+					if use, ok := valDict["use"].(string); ok {
+						formatted = append(formatted, fmt.Sprintf("%s=%s", shortKey, use))
+					}
+				} else if useStr, ok := val.(string); ok {
+					formatted = append(formatted, fmt.Sprintf("%s=%s", shortKey, useStr))
+				}
+			}
+			if len(formatted) > 0 {
+				return fmt.Sprintf("AI Training: %s", strings.Join(formatted, ", "))
+			}
+		} else if use, ok := dict["use"].(string); ok {
+			return fmt.Sprintf("AI Training: %s", use)
+		}
+	}
+
+	// 4. Digital Source Type assertion
+	if strings.Contains(label, "digital_source_type") || strings.Contains(label, "digitalSourceType") {
+		typeVal, _ := dict["digital_source_type"].(string)
+		if typeVal == "" {
+			typeVal, _ = dict["digitalSourceType"].(string)
+		}
+		if typeVal == "" {
+			typeVal, _ = dict["type"].(string)
+		}
+		if typeVal != "" {
+			parts := strings.Split(typeVal, "/")
+			return parts[len(parts)-1]
+		}
+	}
+
+	// 5. AI Generative Info assertion
+	if strings.Contains(label, "generative") || strings.Contains(label, "inference") {
+		if modelDict, ok := dict["model"].(map[string]interface{}); ok {
+			name, _ := modelDict["name"].(string)
+			ver, _ := modelDict["version"].(string)
+			if name != "" && ver != "" {
+				return fmt.Sprintf("model: %s %s", name, ver)
+			} else if name != "" {
+				return fmt.Sprintf("model: %s", name)
+			}
+		}
+		if modelName, ok := dict["model_name"].(string); ok {
+			return fmt.Sprintf("model: %s", modelName)
+		}
+		if prompt, ok := dict["prompt"].(string); ok {
+			return fmt.Sprintf("prompt: %s", prompt)
+		}
+	}
+
 	return ""
 }

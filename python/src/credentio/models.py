@@ -260,13 +260,57 @@ def _map_manifest(dict_: Dict[str, Any], default_label: str) -> Manifest:
 
 
 def _summarize_assertion(label: str, value: Any) -> Optional[str]:
-    if isinstance(value, dict):
-        actions = value.get("actions")
-        if isinstance(actions, list):
-            names = [a.get("action") for a in actions if isinstance(a, dict) and a.get("action")]
-            if names:
-                return ", ".join(names)
-        if "hash_value" in value:
-            hv = str(value["hash_value"])
-            return f"hash: {hv[:16]}…"
+    if not isinstance(value, dict):
+        return None
+
+    # 1. Actions assertion
+    actions = value.get("actions")
+    if isinstance(actions, list):
+        names = [a.get("action") for a in actions if isinstance(a, dict) and a.get("action")]
+        if names:
+            return ", ".join(names)
+
+    # 2. Data hash assertion
+    if "hash_value" in value:
+        hv = str(value["hash_value"])
+        return f"hash: {hv[:16]}…"
+
+    # 3. AI Training and Mining assertion
+    if "training-mining" in label or "data-mining" in label:
+        entries = value.get("entries")
+        if isinstance(entries, dict):
+            formatted = []
+            for k in sorted(entries.keys()):
+                val = entries[k]
+                short_key = k.removeprefix("c2pa.").removeprefix("cawg.")
+                if isinstance(val, dict) and "use" in val:
+                    formatted.append(f"{short_key}={val['use']}")
+                elif isinstance(val, str):
+                    formatted.append(f"{short_key}={val}")
+            if formatted:
+                return f"AI Training: {', '.join(formatted)}"
+        elif "use" in value:
+            return f"AI Training: {value['use']}"
+
+    # 4. Digital Source Type assertion
+    if "digital_source_type" in label or "digitalSourceType" in label:
+        type_val = value.get("digital_source_type") or value.get("digitalSourceType") or value.get("type")
+        if type_val and isinstance(type_val, str):
+            return type_val.split("/")[-1]
+
+    # 5. AI Generative Info assertion
+    if "generative" in label or "inference" in label:
+        model = value.get("model")
+        if isinstance(model, dict):
+            name = model.get("name")
+            ver = model.get("version")
+            if name and ver:
+                return f"model: {name} {ver}"
+            elif name:
+                return f"model: {name}"
+        if "model_name" in value:
+            return f"model: {value['model_name']}"
+        if "prompt" in value:
+            return f"prompt: {value['prompt']}"
+
     return None
