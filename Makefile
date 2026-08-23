@@ -24,7 +24,7 @@ python-test: ## Run Python test suite (pytest)
 
 go-test: ## Run Go test suite (go test)
 	@echo "Running Go tests..."
-	cd go && go test -v ./...
+	cd go && CGO_ENABLED=1 go test -v ./...
 
 swift-test: ## Run Swift unit tests (swift test)
 	@echo "Running Swift tests..."

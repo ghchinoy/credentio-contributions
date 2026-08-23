@@ -223,19 +223,32 @@ func mapManifest(dict map[string]interface{}, defaultLabel string) Manifest {
 	title, _ := dict["title"].(string)
 	format, _ := dict["format"].(string)
 	isUpdate, _ := dict["is_update_manifest"].(bool)
+	if !isUpdate {
+		if iu, ok := dict["isUpdateManifest"].(bool); ok {
+			isUpdate = iu
+		}
+	}
 
 	claimDict, _ := dict["claim"].(map[string]interface{})
 	if claimDict == nil {
-		claimDict = make(map[string]interface{})
+		if c2, ok := dict["claim.v2"].(map[string]interface{}); ok {
+			claimDict = c2
+		} else {
+			claimDict = make(map[string]interface{})
+		}
 	}
 
 	// Generator extraction
 	claimGenerator := ""
-	genList, _ := claimDict["claim_generator_info"].([]interface{})
-	if genList == nil {
-		genList, _ = dict["claim_generator_info"].([]interface{})
-	}
-	if len(genList) > 0 {
+	if genObj, ok := claimDict["claim_generator_info"].(map[string]interface{}); ok {
+		name, _ := genObj["name"].(string)
+		ver, _ := genObj["version"].(string)
+		if name != "" && ver != "" {
+			claimGenerator = fmt.Sprintf("%s %s", name, ver)
+		} else {
+			claimGenerator = name
+		}
+	} else if genList, ok := claimDict["claim_generator_info"].([]interface{}); ok && len(genList) > 0 {
 		if first, ok := genList[0].(map[string]interface{}); ok {
 			name, _ := first["name"].(string)
 			ver, _ := first["version"].(string)
@@ -243,6 +256,19 @@ func mapManifest(dict map[string]interface{}, defaultLabel string) Manifest {
 				claimGenerator = fmt.Sprintf("%s %s", name, ver)
 			} else {
 				claimGenerator = name
+			}
+		}
+	}
+	if claimGenerator == "" {
+		if genList, ok := dict["claim_generator_info"].([]interface{}); ok && len(genList) > 0 {
+			if first, ok := genList[0].(map[string]interface{}); ok {
+				name, _ := first["name"].(string)
+				ver, _ := first["version"].(string)
+				if name != "" && ver != "" {
+					claimGenerator = fmt.Sprintf("%s %s", name, ver)
+				} else {
+					claimGenerator = name
+				}
 			}
 		}
 	}
@@ -260,10 +286,24 @@ func mapManifest(dict map[string]interface{}, defaultLabel string) Manifest {
 	if sigDict == nil {
 		sigDict, _ = dict["signature_info"].(map[string]interface{})
 	}
+	if sigDict == nil {
+		if s, ok := dict["signature"].(map[string]interface{}); ok {
+			sigDict = s
+		}
+	}
 	if sigDict != nil {
 		issuer, _ := sigDict["issuer"].(string)
 		if issuer == "" {
 			issuer, _ = sigDict["common_name"].(string)
+		}
+		if issuer == "" {
+			if certInfo, ok := sigDict["certificateInfo"].(map[string]interface{}); ok {
+				if issObj, ok := certInfo["issuer"].(map[string]interface{}); ok {
+					if cn, ok := issObj["CN"].(string); ok {
+						issuer = cn
+					}
+				}
+			}
 		}
 		alg, _ := sigDict["alg"].(string)
 		if alg == "" {
@@ -274,8 +314,19 @@ func mapManifest(dict map[string]interface{}, defaultLabel string) Manifest {
 			if t, err := time.Parse(time.RFC3339, timeStr); err == nil {
 				parsedTime = &t
 			}
+		} else if tsInfo, ok := sigDict["timeStampInfo"].(map[string]interface{}); ok {
+			if timeStr, ok := tsInfo["timestamp"].(string); ok {
+				if t, err := time.Parse(time.RFC3339, timeStr); err == nil {
+					parsedTime = &t
+				}
+			}
 		}
 		certSummary, _ := sigDict["cert_serial_number"].(string)
+		if certSummary == "" {
+			if certInfo, ok := sigDict["certificateInfo"].(map[string]interface{}); ok {
+				certSummary, _ = certInfo["serialNumber"].(string)
+			}
+		}
 		signature = &SignatureInfo{
 			Issuer:           issuer,
 			Algorithm:        alg,
@@ -304,6 +355,34 @@ func mapManifest(dict map[string]interface{}, defaultLabel string) Manifest {
 	}
 	if statusList == nil {
 		statusList, _ = dict["validation_status"].([]interface{})
+	}
+	if statusList == nil {
+		if valResults, ok := dict["validationResults"].(map[string]interface{}); ok {
+			for _, cat := range []string{"failure", "informational", "success"} {
+				if catList, ok := valResults[cat].([]interface{}); ok {
+					for _, item := range catList {
+						if sDict, ok := item.(map[string]interface{}); ok {
+							if code, ok := sDict["code"].(string); ok {
+								exp, _ := sDict["explanation"].(string)
+								url, _ := sDict["url"].(string)
+								sev := classifySeverity(code)
+								if cat == "failure" {
+									sev = SeverityError
+								} else if cat == "informational" || cat == "success" {
+									sev = SeverityInfo
+								}
+								statuses = append(statuses, ValidationStatus{
+									Code:        code,
+									Explanation: exp,
+									URL:         url,
+									Severity:    sev,
+								})
+							}
+						}
+					}
+				}
+			}
+		}
 	}
 	for _, item := range statusList {
 		if sDict, ok := item.(map[string]interface{}); ok {

@@ -106,3 +106,10 @@ make clean
    Build scripts validate against commit `4ac69fc58256d3871e765f615254373e19e250e9`. Upstream Credentio changes should be verified prior to updating the baseline.
 6. **Architecture Decisions:**
    Substantial architectural choices, FFI changes, or engine models must be recorded as Architecture Decision Records in `docs/adr/`.
+7. **CGO Dynamic Linking and Runtime RPATH:**
+   When working with CGo bindings on macOS (`darwin`), always ensure `-Wl,-rpath,${SRCDIR}/lib -Wl,-rpath,${SRCDIR}/../native` is defined in `#cgo darwin LDFLAGS`. macOS System Integrity Protection (SIP) sanitizes `DYLD_LIBRARY_PATH` across subprocesses, so embedded rpaths are required for downstream Go applications and tests to resolve `libcredentio_c.dylib` seamlessly. Ensure `CGO_ENABLED=1` is specified during builds and test executions.
+8. **C2PA Manifest Schema Resilience:**
+   `ParseCrJSON` implementations across all language bindings (Go, Python, Swift) must accommodate both camelCase and snake_case variations as well as C2PA v1 and v2 payload schemas (e.g. `claim` vs `claim.v2`, `certificateInfo` with `issuer.CN`, and `validationResults` categorizing `success`, `failure`, and `informational` entries).
+9. **Agent-Aware CLI Design:**
+   CLI applications consuming these bindings should adhere to Agent-Aware standards: logical Cobra `GroupID` command categorization, structured `--json` output flags, proactive error hints, and semantic Lipgloss color palettes.
+

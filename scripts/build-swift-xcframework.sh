@@ -24,9 +24,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 OUTPUT_XCFRAMEWORK="${REPO_DIR}/swift/CredentioC.xcframework"
 
+CREDENTIO_GIT_URL="${CREDENTIO_GIT_URL:-https://mediaprovenance.googlesource.com/credentio}"
+CREDENTIO_SHA="${CREDENTIO_SHA:-4ac69fc58256d3871e765f615254373e19e250e9}"
+
 echo "=== Building Credentio C-ABI static xcframework for Swift ==="
 
-# 1. Locate Credentio checkout
+# 1. Locate or clone Credentio checkout
 CREDENTIO_DIR="${CREDENTIO_DIR:-}"
 if [[ -z "${CREDENTIO_DIR}" ]]; then
   for candidate in \
@@ -41,8 +44,11 @@ if [[ -z "${CREDENTIO_DIR}" ]]; then
 fi
 
 if [[ -z "${CREDENTIO_DIR}" || ! -d "${CREDENTIO_DIR}" ]]; then
-  echo "ERROR: Credentio checkout not found. Set CREDENTIO_DIR=/path/to/credentio" >&2
-  exit 1
+  echo "==> Credentio checkout not found locally. Cloning from ${CREDENTIO_GIT_URL}..."
+  CLONE_DIR="$(mktemp -d /tmp/credentio-clone.XXXXXX)"
+  git clone "${CREDENTIO_GIT_URL}" "${CLONE_DIR}"
+  (cd "${CLONE_DIR}" && git checkout "${CREDENTIO_SHA}")
+  CREDENTIO_DIR="${CLONE_DIR}"
 fi
 
 echo "==> Using Credentio at: ${CREDENTIO_DIR}"
@@ -55,14 +61,6 @@ cp -f "${REPO_DIR}/native/credentio_c.cc" "${OVERLAY_TARGET}/credentio_c.cc"
 cp -f "${REPO_DIR}/native/BUILD" "${OVERLAY_TARGET}/BUILD"
 echo "==> Overlaid C-ABI wrapper to ${OVERLAY_TARGET}"
 
-# 3. Build static library with Bazel for macOS arm64
-echo "==> Invoking Bazel build //bindings_c:credentio_c..."
-(
-  cd "${CREDENTIO_DIR}"
-  bazel build //bindings_c:credentio_c
-)
-
-# 4. Prepare temporary staging for static archive merge
 STAGE_DIR="$(mktemp -d /tmp/credentio-c-stage.XXXXXX)"
 trap 'rm -rf "${STAGE_DIR}"' EXIT
 
@@ -71,66 +69,129 @@ mkdir -p "${HEADERS_DIR}"
 cp -f "${REPO_DIR}/native/credentio_c.h" "${HEADERS_DIR}/credentio_c.h"
 cp -f "${REPO_DIR}/native/module.modulemap" "${HEADERS_DIR}/module.modulemap"
 
-echo "==> Resolving static archive dependency closure via Bazel CcInfo..."
-EXEC_ROOT="$(cd "${CREDENTIO_DIR}" && bazel info execution_root 2>/dev/null || echo "")"
-BAZEL_BIN="$(cd "${CREDENTIO_DIR}" && bazel info bazel-bin 2>/dev/null || echo "")"
-
-RAW_LIST="${STAGE_DIR}/raw_archives.txt"
-ARCHIVE_LIST="${STAGE_DIR}/archives.txt"
-touch "${RAW_LIST}"
-
-# Query transitive static libraries from CcInfo linking context
-STAGED_EXPR='"\n".join([f.path for li in providers(target)["CcInfo"].linking_context.linker_inputs.to_list() for lib in li.libraries for f in [lib.static_library, lib.pic_static_library] if f])'
-
-CQUERY_OUT="$(cd "${CREDENTIO_DIR}" && bazel cquery //bindings_c:credentio_c --output=starlark --starlark:expr="${STAGED_EXPR}" 2>/dev/null || true)"
-
-if [[ -n "${CQUERY_OUT}" ]]; then
-  while IFS= read -r rel_path; do
-    [[ -z "${rel_path}" ]] && continue
-    if [[ "${rel_path}" == /* && -f "${rel_path}" ]]; then
-      echo "${rel_path}" >> "${RAW_LIST}"
-    elif [[ -n "${EXEC_ROOT}" && -f "${EXEC_ROOT}/${rel_path}" ]]; then
-      echo "${EXEC_ROOT}/${rel_path}" >> "${RAW_LIST}"
-    elif [[ -f "${CREDENTIO_DIR}/${rel_path}" ]]; then
-      echo "${CREDENTIO_DIR}/${rel_path}" >> "${RAW_LIST}"
-    elif [[ -n "${BAZEL_BIN}" && -f "${BAZEL_BIN}/${rel_path}" ]]; then
-      echo "${BAZEL_BIN}/${rel_path}" >> "${RAW_LIST}"
-    fi
-  done <<< "${CQUERY_OUT}"
+# Copy license if available
+if [[ -f "${CREDENTIO_DIR}/LICENSE" ]]; then
+  cp -f "${CREDENTIO_DIR}/LICENSE" "${HEADERS_DIR}/LICENSE.credentio"
 fi
 
-# Also scan bazel-bin for any complementary static archives (.a or .lo)
-if [[ -n "${BAZEL_BIN}" && -d "${BAZEL_BIN}" ]]; then
-  find "${BAZEL_BIN}" \( -name "*.a" -o -name "*.lo" \) -type f >> "${RAW_LIST}" 2>/dev/null || true
+# Function to build and resolve static archive for a target configuration
+build_static_archive() {
+  local label="$1"
+  local extra_flags="${2:-}"
+  local out_file="${STAGE_DIR}/libCredentioC_${label}.a"
+
+  echo "==> Building static archive for ${label} with Bazel (flags: ${extra_flags})..."
+  # shellcheck disable=SC2086
+  (
+    cd "${CREDENTIO_DIR}"
+    bazel build ${extra_flags} //bindings_c:credentio_c
+  )
+
+  local raw_list="${STAGE_DIR}/raw_archives_${label}.txt"
+  local archive_list="${STAGE_DIR}/archives_${label}.txt"
+  touch "${raw_list}"
+
+  local exec_root
+  local bazel_bin
+  exec_root="$(cd "${CREDENTIO_DIR}" && bazel info execution_root 2>/dev/null || echo "")"
+  bazel_bin="$(cd "${CREDENTIO_DIR}" && bazel info bazel-bin 2>/dev/null || echo "")"
+
+  local staged_expr='"\n".join([f.path for li in providers(target)["CcInfo"].linking_context.linker_inputs.to_list() for lib in li.libraries for f in [lib.static_library, lib.pic_static_library] if f])'
+  # shellcheck disable=SC2086
+  local cquery_out
+  cquery_out="$(cd "${CREDENTIO_DIR}" && bazel cquery ${extra_flags} //bindings_c:credentio_c --output=starlark --starlark:expr="${staged_expr}" 2>/dev/null || true)"
+
+  if [[ -n "${cquery_out}" ]]; then
+    while IFS= read -r rel_path; do
+      [[ -z "${rel_path}" ]] && continue
+      if [[ "${rel_path}" == /* && -f "${rel_path}" ]]; then
+        echo "${rel_path}" >> "${raw_list}"
+      elif [[ -n "${exec_root}" && -f "${exec_root}/${rel_path}" ]]; then
+        echo "${exec_root}/${rel_path}" >> "${raw_list}"
+      elif [[ -f "${CREDENTIO_DIR}/${rel_path}" ]]; then
+        echo "${CREDENTIO_DIR}/${rel_path}" >> "${raw_list}"
+      elif [[ -n "${bazel_bin}" && -f "${bazel_bin}/${rel_path}" ]]; then
+        echo "${bazel_bin}/${rel_path}" >> "${raw_list}"
+      fi
+    done <<< "${cquery_out}"
+  fi
+
+  if [[ -n "${bazel_bin}" && -d "${bazel_bin}" ]]; then
+    find "${bazel_bin}" \( -name "*.a" -o -name "*.lo" \) -type f >> "${raw_list}" 2>/dev/null || true
+  fi
+
+  if [[ -f "${raw_list}" ]]; then
+    sort -u "${raw_list}" | while IFS= read -r f; do
+      [[ -n "$f" && -r "$f" ]] && echo "$f"
+    done > "${archive_list}"
+  fi
+
+  local count
+  count="$(wc -l < "${archive_list}" | tr -d ' ')"
+  echo "==> Found ${count} static archive(s) for ${label}."
+  if [[ "${count}" -eq 0 ]]; then
+    echo "ERROR: Could not resolve static archives for ${label}." >&2
+    return 1
+  fi
+
+  libtool -static -o "${out_file}" -filelist "${archive_list}"
+  echo "${out_file}"
+}
+
+# 3. Build archives (attempt dual-arch arm64 + x86_64, falling back to host arch if needed)
+BUILT_ARCHIVES=()
+
+# Primary host build
+echo "==> Building primary host architecture..."
+if HOST_ARCHIVE="$(build_static_archive "host" "")"; then
+  BUILT_ARCHIVES+=("${HOST_ARCHIVE}")
 fi
 
-# Deduplicate and verify archive files
-if [[ -f "${RAW_LIST}" ]]; then
-  sort -u "${RAW_LIST}" | while IFS= read -r f; do
-    [[ -n "$f" && -r "$f" ]] && echo "$f"
-  done > "${ARCHIVE_LIST}"
+# Attempt secondary architecture for universal binary if on macOS Apple Silicon
+if [[ "$(uname -m)" == "arm64" && "${BUILD_UNIVERSAL:-1}" == "1" ]]; then
+  echo "==> Attempting x86_64 cross-build for universal macOS binary..."
+  if X86_ARCHIVE="$(build_static_archive "x86_64" "--cpu=darwin_x86_64" 2>/dev/null)"; then
+    BUILT_ARCHIVES+=("${X86_ARCHIVE}")
+  else
+    echo "==> Note: x86_64 build not available in this environment; proceeding with arm64."
+  fi
 fi
 
-ARCHIVE_COUNT="$(wc -l < "${ARCHIVE_LIST}" | tr -d ' ')"
-echo "==> Found ${ARCHIVE_COUNT} static archive(s) to merge."
-
-if [[ "${ARCHIVE_COUNT}" -eq 0 ]]; then
-  echo "ERROR: Could not resolve static archives for //bindings_c:credentio_c." >&2
-  exit 1
+FINAL_STATIC_LIB="${STAGE_DIR}/libCredentioC.a"
+if [[ "${#BUILT_ARCHIVES[@]}" -gt 1 ]]; then
+  echo "==> Creating universal binary with lipo (${#BUILT_ARCHIVES[@]} slices)..."
+  lipo -create -output "${FINAL_STATIC_LIB}" "${BUILT_ARCHIVES[@]}"
+else
+  cp -f "${BUILT_ARCHIVES[0]}" "${FINAL_STATIC_LIB}"
 fi
 
-MERGED_LIB="${STAGE_DIR}/libCredentioC.a"
-echo "==> Merging static archives with libtool..."
-libtool -static -o "${MERGED_LIB}" -filelist "${ARCHIVE_LIST}"
-
-# 5. Package into XCFramework with xcodebuild
+# 4. Package into XCFramework with xcodebuild
 echo "==> Packaging into XCFramework at ${OUTPUT_XCFRAMEWORK}..."
 rm -rf "${OUTPUT_XCFRAMEWORK}"
 xcodebuild -create-xcframework \
-  -library "${MERGED_LIB}" \
+  -library "${FINAL_STATIC_LIB}" \
   -headers "${HEADERS_DIR}" \
   -output "${OUTPUT_XCFRAMEWORK}"
 
 echo "======================================================="
 echo "SUCCESS: Created ${OUTPUT_XCFRAMEWORK}"
 echo "======================================================="
+
+# 5. Optional release zip and SwiftPM checksum
+if [[ "${1:-}" == "--zip" || "${CREDENTIO_ZIP_RELEASE:-0}" == "1" ]]; then
+  ZIP_PATH="${REPO_DIR}/swift/CredentioC.xcframework.zip"
+  echo "==> Creating release archive at ${ZIP_PATH}..."
+  rm -f "${ZIP_PATH}"
+  (
+    cd "${REPO_DIR}/swift"
+    zip -q -r -y "CredentioC.xcframework.zip" "CredentioC.xcframework"
+  )
+  if command -v swift >/dev/null 2>&1; then
+    CHECKSUM="$(swift package compute-checksum "${ZIP_PATH}")"
+    echo "======================================================="
+    echo "Release Archive:  swift/CredentioC.xcframework.zip"
+    echo "SwiftPM Checksum: ${CHECKSUM}"
+    echo "======================================================="
+    echo "${CHECKSUM}" > "${REPO_DIR}/swift/CredentioC.xcframework.zip.sha256"
+  fi
+fi

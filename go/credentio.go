@@ -16,7 +16,7 @@ package credentio
 
 /*
 #cgo CFLAGS: -I${SRCDIR}/include -I${SRCDIR}/../native
-#cgo darwin LDFLAGS: -L${SRCDIR}/lib -L${SRCDIR}/../native -lcredentio_c
+#cgo darwin LDFLAGS: -L${SRCDIR}/lib -L${SRCDIR}/../native -lcredentio_c -Wl,-rpath,${SRCDIR}/lib -Wl,-rpath,${SRCDIR}/../native
 #cgo linux LDFLAGS: -L${SRCDIR}/lib -L${SRCDIR}/../native -lcredentio_c -Wl,-rpath,${SRCDIR}/lib -Wl,-rpath,${SRCDIR}/../native
 #include "credentio_c.h"
 #include <stdlib.h>

@@ -21,9 +21,12 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
+CREDENTIO_GIT_URL="${CREDENTIO_GIT_URL:-https://mediaprovenance.googlesource.com/credentio}"
+CREDENTIO_SHA="${CREDENTIO_SHA:-4ac69fc58256d3871e765f615254373e19e250e9}"
+
 echo "=== Building libcredentio_c shared library ==="
 
-# 1. Locate Credentio checkout
+# 1. Locate or clone Credentio checkout
 CREDENTIO_DIR="${CREDENTIO_DIR:-}"
 if [[ -z "${CREDENTIO_DIR}" ]]; then
   for candidate in \
@@ -38,8 +41,11 @@ if [[ -z "${CREDENTIO_DIR}" ]]; then
 fi
 
 if [[ -z "${CREDENTIO_DIR}" || ! -d "${CREDENTIO_DIR}" ]]; then
-  echo "ERROR: Credentio checkout not found. Set CREDENTIO_DIR=/path/to/credentio" >&2
-  exit 1
+  echo "==> Credentio checkout not found locally. Cloning from ${CREDENTIO_GIT_URL}..."
+  CLONE_DIR="$(mktemp -d /tmp/credentio-clone.XXXXXX)"
+  git clone "${CREDENTIO_GIT_URL}" "${CLONE_DIR}"
+  (cd "${CLONE_DIR}" && git checkout "${CREDENTIO_SHA}")
+  CREDENTIO_DIR="${CLONE_DIR}"
 fi
 
 echo "==> Using Credentio at: ${CREDENTIO_DIR}"
@@ -102,6 +108,12 @@ chmod 755 "${PY_LIB_DIR}/${TARGET_LIB_NAME}" "${GO_LIB_DIR}/${TARGET_LIB_NAME}"
 
 cp -f "${REPO_DIR}/native/credentio_c.h" "${PY_INC_DIR}/credentio_c.h"
 cp -f "${REPO_DIR}/native/credentio_c.h" "${GO_INC_DIR}/credentio_c.h"
+
+# Copy upstream license for distribution compliance
+if [[ -f "${CREDENTIO_DIR}/LICENSE" ]]; then
+  cp -f "${CREDENTIO_DIR}/LICENSE" "${REPO_DIR}/python/LICENSE.credentio"
+  cp -f "${CREDENTIO_DIR}/LICENSE" "${REPO_DIR}/go/LICENSE.credentio"
+fi
 
 # Fix macOS dynamic library install name if on darwin
 if [[ "$(uname)" == "Darwin" ]] && command -v install_name_tool >/dev/null 2>&1; then
