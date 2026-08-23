@@ -88,6 +88,22 @@ public struct ProvenanceReport: Sendable, Equatable {
     }
 }
 
+// MARK: - Convenience Accessors
+
+extension ProvenanceReport {
+    /// Returns true if credentials are present and pass all validation checks.
+    public var isVerified: Bool { badge == .signed }
+
+    /// Returns true if credentials are present but failed validation (e.g. invalid signature, hash mismatch).
+    public var isInvalid: Bool { badge == .invalid }
+
+    /// Claim generator software agent of the active manifest if available.
+    public var primaryClaimGenerator: String? { activeManifest?.claimGenerator }
+
+    /// Signing authority/issuer of the active manifest signature if available.
+    public var primarySignerIssuer: String? { activeManifest?.signature?.issuer }
+}
+
 /// The three-state credential badge.
 public enum CredentialBadgeState: String, Sendable, Equatable {
     case signed

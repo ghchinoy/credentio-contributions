@@ -189,4 +189,36 @@ final class CredentioCrjsonMapperTests: XCTestCase {
         )
         XCTAssertEqual(reportInvalid.badge, .invalid)
     }
+
+    func testConvenienceAccessors() {
+        let manifest = Manifest(
+            label: "test_label",
+            claimGenerator: "CameraAgent 1.0",
+            signature: SignatureInfo(issuer: "Trusted Issuer")
+        )
+
+        let verifiedReport = ProvenanceReport(
+            engineID: "credentio",
+            engineName: "Credentio",
+            hasCredentials: true,
+            elapsed: .milliseconds(5),
+            activeManifest: manifest
+        )
+        XCTAssertTrue(verifiedReport.isVerified)
+        XCTAssertFalse(verifiedReport.isInvalid)
+        XCTAssertEqual(verifiedReport.primaryClaimGenerator, "CameraAgent 1.0")
+        XCTAssertEqual(verifiedReport.primarySignerIssuer, "Trusted Issuer")
+
+        let invalidStatus = ValidationStatus(code: "signature.invalid", severity: .error)
+        let invalidManifest = Manifest(label: "invalid", validationStatuses: [invalidStatus])
+        let invalidReport = ProvenanceReport(
+            engineID: "credentio",
+            engineName: "Credentio",
+            hasCredentials: true,
+            elapsed: .milliseconds(5),
+            activeManifest: invalidManifest
+        )
+        XCTAssertFalse(invalidReport.isVerified)
+        XCTAssertTrue(invalidReport.isInvalid)
+    }
 }
