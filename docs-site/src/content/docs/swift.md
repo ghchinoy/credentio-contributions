@@ -1,6 +1,6 @@
 ---
 title: Swift Package Reference (CredentioKit)
-description: API documentation and usage patterns for the CredentioKit Swift package.
+description: API documentation, SupportedFormats, App Sandbox compliance, and SwiftUI integration for CredentioKit.
 ---
 
 `CredentioKit` provides high-performance, actor-isolated C2PA verification for Apple platforms (macOS 14.0+ and iOS 16.0+), powered in-process by Google Credentio.
@@ -27,9 +27,15 @@ targets: [
 ]
 ```
 
-### Local Source Build
+### Pure Swift vs. Native In-Process Engine
 
-`CredentioKit` can also link a locally built `CredentioC.xcframework` directly. Compile the static XCFramework from the repository root on macOS:
+`CredentioKit` is designed to be modular:
+- **Pure Swift Mode:** Compiles out of the box with zero C++ toolchain requirements. In pure Swift mode, `CredentioKit` provides all data models, format utilities, and `CredentioCLIEngine` (invoking the `c2pa_validate` CLI subprocess).
+- **Native In-Process Mode:** When linked against `CredentioC.xcframework` (via remote package or local `make build-swift`), `CredentioNativeEngine` executes directly in-process with sub-millisecond core verification.
+
+### Local Source Build (Optional)
+
+To compile the static XCFramework locally from Google Credentio source on macOS:
 
 ```bash
 make build-swift
@@ -82,7 +88,114 @@ do {
 
 ---
 
-## 3. Models and Types
+## 3. macOS and iOS App Sandbox Compatibility
+
+Apple App Store and sandboxed desktop environments enforce strict security boundaries regarding process creation and entitlements:
+
+- **`CredentioNativeEngine` (App Sandbox Compliant):** Links directly to the static `CredentioC.xcframework` library and executes inside your app address space. It requires zero subprocess entitlements, makes no out-of-process system calls, and is 100% compliant with the macOS and iOS App Sandbox.
+- **`CredentioCLIEngine` (Developer & Tooling):** Spawns the `c2pa_validate` binary via Foundation `Process`. This engine is designed for CLI utilities and unsandboxed developer environments.
+
+---
+
+## 4. Format Detection with `SupportedFormats`
+
+`CredentioKit` includes built-in file format and MIME type resolution across images, video, audio, and documents:
+
+```swift
+import CredentioKit
+
+let imageURL = URL(fileURLWithPath: "photo.jpg")
+
+// Inspect MIME type
+let mimeType = SupportedFormats.mediaType(for: imageURL) // "image/jpeg"
+
+// Inspect category
+let category = SupportedFormats.category(for: imageURL)  // .image
+
+// Check format support
+if SupportedFormats.isSupported(imageURL) {
+    print("Format is supported by Credentio")
+}
+```
+
+### Supported Categories:
+- **`Category.image`:** JPEG, PNG, HEIC, HEIF, WebP, AVIF, TIFF, DNG
+- **`Category.video`:** MP4, MOV, QuickTime, AVI, WebM
+- **`Category.audio`:** MP3, WAV, M4A, AAC, FLAC, OGG
+- **`Category.document`:** PDF, DOCX, XLSX, PPTX
+
+---
+
+## 5. SwiftUI Integration Example
+
+Here is a complete pattern for integrating `CredentioNativeEngine` into a modern SwiftUI application using `@Observable` and Swift 6 concurrency:
+
+```swift
+import CredentioKit
+import SwiftUI
+
+@Observable
+@MainActor
+final class ProvenanceInspectorViewModel {
+    var report: ProvenanceReport?
+    var isLoading = false
+    var errorMessage: String?
+
+    private let engine = CredentioNativeEngine(skipTrustChecks: true)
+
+    func inspect(fileURL: URL) async {
+        guard SupportedFormats.isSupported(fileURL) else {
+            errorMessage = "Unsupported format: \(fileURL.pathExtension)"
+            return
+        }
+
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+
+        do {
+            report = try await engine.read(url: fileURL)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+}
+
+struct ProvenanceInspectorView: View {
+    @State private var viewModel = ProvenanceInspectorViewModel()
+    let assetURL: URL
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if viewModel.isLoading {
+                ProgressView("Inspecting credentials...")
+            } else if let report = viewModel.report {
+                HStack {
+                    Text("Badge:")
+                    Text(report.badge.rawValue.uppercased())
+                        .fontWeight(.bold)
+                }
+                if let generator = report.primaryClaimGenerator {
+                    Text("Generator: \(generator)")
+                }
+                if let signer = report.primarySignerIssuer {
+                    Text("Signer: \(signer)")
+                }
+            } else if let error = viewModel.errorMessage {
+                Text(error)
+                    .foregroundStyle(.red)
+            }
+        }
+        .task {
+            await viewModel.inspect(fileURL: assetURL)
+        }
+    }
+}
+```
+
+---
+
+## 6. Models and Types
 
 ### `ProvenanceReport`
 ```swift
@@ -98,6 +211,12 @@ public struct ProvenanceReport: Sendable, Equatable {
     public var ingredientManifests: [Manifest]
     public var rawJSON: String?
     public var badge: CredentialBadgeState        // .signed, .unsigned, .invalid
+    
+    // Convenience Accessors
+    public var isVerified: Bool                   // True if badge == .signed
+    public var isInvalid: Bool                    // True if badge == .invalid
+    public var primaryClaimGenerator: String?
+    public var primarySignerIssuer: String?
 }
 ```
 
@@ -117,7 +236,7 @@ public struct Manifest: Sendable, Equatable, Identifiable {
 
 ---
 
-## 4. Standalone crJSON Deserializer
+## 7. Standalone crJSON Deserializer
 
 If you obtain crJSON strings from external sources (such as CLI logs or network payloads), you can deserialize them into a typed `ProvenanceReport`:
 

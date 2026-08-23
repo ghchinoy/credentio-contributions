@@ -9,8 +9,10 @@ High-performance native Swift bindings for [Google Credentio](https://mediaprove
 `CredentioKit` provides:
 - **In-process C2PA validation**: Sub-millisecond core verification running directly via a C-ABI static XCFramework (`CredentioC.xcframework`).
 - **Sendable & Actor-isolated**: Pure Swift 6 concurrency safety.
+- **App Sandbox Compliant**: In-process engine requires zero child subprocesses or sandbox entitlements.
+- **Pure Swift Fallback**: Compiles immediately with zero C++ toolchain requirements for CLI/crJSON workflows.
+- **Built-in Format Detection**: `SupportedFormats` helper for image, video, audio, and document validation.
 - **Cross-platform Apple support**: macOS 14.0+ and iOS 16.0+.
-- **Engine-agnostic data models**: Standardized `ProvenanceReport` and `Manifest` models.
 
 ---
 
@@ -36,7 +38,7 @@ targets: [
 
 ### 2. Local Source Build (Optional)
 
-To compile the static XCFramework locally from Google Credentio source:
+To compile the static XCFramework locally from Google Credentio source on macOS:
 
 ```bash
 make build-swift
@@ -50,17 +52,23 @@ make build-swift
 import CredentioKit
 import Foundation
 
-// 1. Initialize the actor-isolated native engine
+// 1. Check format support
+let fileURL = URL(fileURLWithPath: "photo.jpg")
+guard SupportedFormats.isSupported(fileURL) else {
+    print("Unsupported format: \(fileURL.pathExtension)")
+    exit(1)
+}
+
+// 2. Initialize the actor-isolated native engine
 let engine = CredentioNativeEngine(skipTrustChecks: true)
 
-// 2. Validate a media file
-let fileURL = URL(fileURLWithPath: "photo.jpg")
+// 3. Validate a media file
 let report = try await engine.read(url: fileURL)
 
 if report.hasCredentials {
     print("Badge Status:     \(report.badge.rawValue)") // "signed", "unsigned", "invalid"
-    print("Claim Generator:  \(report.activeManifest?.claimGenerator ?? "Unknown")")
-    print("Signer Issuer:    \(report.activeManifest?.signature?.issuer ?? "Unknown")")
+    print("Claim Generator:  \(report.primaryClaimGenerator ?? "Unknown")")
+    print("Signer Issuer:    \(report.primarySignerIssuer ?? "Unknown")")
     if let coreTime = report.engineInternalElapsed {
         print("Core Engine Time: \(coreTime)")
     }
