@@ -77,10 +77,12 @@ jobs:
           - os: macos-14
             platform_tag: darwin-arm64
             lib_name: libcredentio_c.dylib
+            ext: dylib
             cibw_archs: arm64
           - os: ubuntu-latest
             platform_tag: linux-amd64
             lib_name: libcredentio_c.so
+            ext: so
             cibw_archs: x86_64
     steps:
       - uses: actions/checkout@v4
@@ -109,7 +111,7 @@ jobs:
         run: |
           mkdir -p release-libs
           if [ -f "go/lib/${{ matrix.lib_name }}" ]; then
-            cp "go/lib/${{ matrix.lib_name }}" "release-libs/libcredentio_c-${{ matrix.platform_tag }}.${{ matrix.lib_name##*.}}"
+            cp "go/lib/${{ matrix.lib_name }}" "release-libs/libcredentio_c-${{ matrix.platform_tag }}.${{ matrix.ext }}"
           fi
 
       - name: Build wheels via cibuildwheel
