@@ -69,11 +69,11 @@ curl -sLO https://raw.githubusercontent.com/c2pa-org/conformance-public/main/tes
   <TabItem label="Go" icon="seti:go">
     ### 1. Build Native Library & Compile Go Binary
     ```bash
-    # Build libcredentio_c.dylib / .so
-    make build-lib
+    # Fetch prebuilt library or build from source
+    make fetch-lib   # or: make build-lib
 
     # Build the standalone Go executable
-    cd go && go build -o ../bin/credentio ./cmd/credentio && cd ..
+    cd go && CGO_ENABLED=1 go build -o ../bin/credentio ./cmd/credentio && cd ..
     ```
 
     ### 2. Validate Media Assets

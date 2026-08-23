@@ -23,6 +23,8 @@ Or compile the native library from source using Bazel:
 make build-lib
 ```
 
+> **Note on CGO:** Building downstream applications or running tests requires `CGO_ENABLED=1`. On macOS, dynamic linking rpaths are embedded directly in the package LDFLAGS, so no manual `DYLD_LIBRARY_PATH` configuration is necessary.
+
 ---
 
 ## 2. The `Validator` Type
@@ -129,3 +131,5 @@ If you already have raw crJSON strings produced by Credentio's CLI (`c2pa_valida
 ```go
 report, err := credentio.ParseCrJSON(rawJSONString, "image/jpeg", 0.0, 0.0)
 ```
+
+The parser accommodates both standard C2PA manifests and Google C2PA Core Toolkit payloads (including `claim.v2`, structured `certificateInfo`, `timeStampInfo`, and categorized `validationResults`).

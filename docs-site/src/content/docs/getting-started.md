@@ -85,7 +85,7 @@ python3 example.py
 
 ## 5. Go Quick Start
 
-Create `main.go`:
+Ensure the native shared library is available (via `make fetch-lib` or Step 3 `make build-lib`), then create `main.go`:
 
 ```go
 package main
@@ -126,7 +126,7 @@ func main() {
 
 Run the program:
 ```bash
-go run main.go
+CGO_ENABLED=1 go run main.go
 ```
 
 ---
