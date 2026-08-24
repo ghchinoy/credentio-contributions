@@ -59,11 +59,11 @@ cp -f "${REPO_DIR}/native/BUILD" "${OVERLAY_DIR}/BUILD"
 echo "==> Overlaid C-ABI wrapper to ${OVERLAY_DIR}"
 
 # 3. Build shared library via Bazel
-echo "==> Invoking Bazel build //bindings_c:libcredentio_c (extra flags: ${CREDENTIO_EXTRA_BAZEL_FLAGS:-none})..."
+echo "==> Invoking Bazel build //bindings_c:libcredentio_c (startup flags: ${CREDENTIO_BAZEL_STARTUP_FLAGS:-none}, extra flags: ${CREDENTIO_EXTRA_BAZEL_FLAGS:-none})..."
 # shellcheck disable=SC2086
 (
   cd "${CREDENTIO_DIR}"
-  bazel build ${CREDENTIO_EXTRA_BAZEL_FLAGS:-} //bindings_c:libcredentio_c
+  bazel ${CREDENTIO_BAZEL_STARTUP_FLAGS:-} build ${CREDENTIO_EXTRA_BAZEL_FLAGS:-} //bindings_c:libcredentio_c
 )
 
 BAZEL_BIN="$(cd "${CREDENTIO_DIR}" && bazel info bazel-bin 2>/dev/null)"
