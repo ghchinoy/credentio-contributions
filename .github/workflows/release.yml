@@ -126,10 +126,11 @@ jobs:
           CIBW_SKIP: "*-musllinux_*"
           CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
           CIBW_BEFORE_ALL_LINUX: >
-            (dnf install -y clang gcc-toolset-12 git epel-release 2>/dev/null || yum install -y clang gcc-toolset-12 git epel-release 2>/dev/null || true) &&
-            (dnf install -y libcxx-devel libcxxabi-devel 2>/dev/null || yum install -y libcxx-devel libcxxabi-devel 2>/dev/null || true) &&
+            (dnf install -y gcc-toolset-12 git 2>/dev/null || yum install -y gcc-toolset-12 git 2>/dev/null || true) &&
+            ([ -f /opt/rh/gcc-toolset-12/enable ] && source /opt/rh/gcc-toolset-12/enable || true) &&
             curl -sLo /usr/local/bin/bazel https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-linux-amd64 &&
             chmod +x /usr/local/bin/bazel &&
+            export CREDENTIO_EXTRA_BAZEL_FLAGS="--repo_env=CC=gcc --repo_env=CXX=g++ --cxxopt=-stdlib=libstdc++ --linkopt=-stdlib=libstdc++" &&
             ./scripts/build-shared-lib.sh
           CIBW_BEFORE_ALL_MACOS: ./scripts/build-shared-lib.sh
           CIBW_ENVIRONMENT: "CREDENTIO_GIT_URL=https://mediaprovenance.googlesource.com/credentio CREDENTIO_SHA=4ac69fc58256d3871e765f615254373e19e250e9"
