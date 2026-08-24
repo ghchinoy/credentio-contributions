@@ -150,19 +150,41 @@ fi
 # Attempt secondary architecture for universal binary if on macOS Apple Silicon
 if [[ "$(uname -m)" == "arm64" && "${BUILD_UNIVERSAL:-1}" == "1" ]]; then
   echo "==> Attempting x86_64 cross-build for universal macOS binary..."
-  if X86_ARCHIVE="$(build_static_archive "x86_64" "--cpu=darwin_x86_64" 2>/dev/null)"; then
+  if X86_ARCHIVE="$(build_static_archive "x86_64" "--platforms=@build_bazel_apple_support//platforms:macos_x86_64" 2>/dev/null)"; then
+    BUILT_ARCHIVES+=("${X86_ARCHIVE}")
+  elif X86_ARCHIVE="$(build_static_archive "x86_64" "--cpu=darwin_x86_64" 2>/dev/null)"; then
     BUILT_ARCHIVES+=("${X86_ARCHIVE}")
   else
     echo "==> Note: x86_64 build not available in this environment; proceeding with arm64."
   fi
 fi
 
+# Deduplicate archives by architecture to prevent lipo fatal errors
+UNIQUE_ARCHIVES=()
+SEEN_ARCHS=()
+
+for arch_file in "${BUILT_ARCHIVES[@]}"; do
+  if [[ -f "${arch_file}" ]]; then
+    ARCH_INFO="$(lipo -archs "${arch_file}" 2>/dev/null || echo "unknown")"
+    if [[ ! " ${SEEN_ARCHS[*]:-} " =~ " ${ARCH_INFO} " ]]; then
+      SEEN_ARCHS+=("${ARCH_INFO}")
+      UNIQUE_ARCHIVES+=("${arch_file}")
+    else
+      echo "==> Note: Duplicate architecture slice '${ARCH_INFO}' detected; skipping redundant archive."
+    fi
+  fi
+done
+
 FINAL_STATIC_LIB="${STAGE_DIR}/libCredentioC.a"
-if [[ "${#BUILT_ARCHIVES[@]}" -gt 1 ]]; then
-  echo "==> Creating universal binary with lipo (${#BUILT_ARCHIVES[@]} slices)..."
-  lipo -create -output "${FINAL_STATIC_LIB}" "${BUILT_ARCHIVES[@]}"
+if [[ "${#UNIQUE_ARCHIVES[@]}" -gt 1 ]]; then
+  echo "==> Creating universal binary with lipo (${#UNIQUE_ARCHIVES[@]} slices: ${SEEN_ARCHS[*]})..."
+  lipo -create -output "${FINAL_STATIC_LIB}" "${UNIQUE_ARCHIVES[@]}"
+elif [[ "${#UNIQUE_ARCHIVES[@]}" -eq 1 ]]; then
+  echo "==> Packaging single architecture (${SEEN_ARCHS[*]})..."
+  cp -f "${UNIQUE_ARCHIVES[0]}" "${FINAL_STATIC_LIB}"
 else
-  cp -f "${BUILT_ARCHIVES[0]}" "${FINAL_STATIC_LIB}"
+  echo "ERROR: No valid static archives available for packaging." >&2
+  exit 1
 fi
 
 # 4. Package into XCFramework with xcodebuild

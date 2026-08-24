@@ -90,7 +90,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Bazel
+      - name: Set up Bazel (macOS)
+        if: runner.os == 'macOS'
         uses: bazel-contrib/setup-bazel@0.15.0
         with:
           bazelisk-cache: true
@@ -101,11 +102,13 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Build Native Shared Library
+      - name: Build Native Shared Library (macOS host)
+        if: runner.os == 'macOS'
         run: |
           ./scripts/build-shared-lib.sh
 
-      - name: Stage named platform binary for Go release assets
+      - name: Stage named platform binary for Go release assets (macOS)
+        if: runner.os == 'macOS'
         run: |
           mkdir -p release-libs
           if [ -f "go/lib/${{ matrix.lib_name }}" ]; then
@@ -122,11 +125,24 @@ jobs:
           CIBW_BUILD: "cp39-* cp310-* cp311-* cp312-*"
           CIBW_SKIP: "*-musllinux_*"
           CIBW_BEFORE_ALL_LINUX: >
+            (command -v yum >/dev/null 2>&1 && yum install -y clang clang-devel llvm-toolset git || true) &&
             curl -sLo /usr/local/bin/bazel https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-linux-amd64 &&
             chmod +x /usr/local/bin/bazel &&
             ./scripts/build-shared-lib.sh
           CIBW_BEFORE_ALL_MACOS: ./scripts/build-shared-lib.sh
           CIBW_ENVIRONMENT: "CREDENTIO_GIT_URL=https://mediaprovenance.googlesource.com/credentio CREDENTIO_SHA=4ac69fc58256d3871e765f615254373e19e250e9"
+
+      - name: Stage named platform binary for Go release assets (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p release-libs
+          if [ -f "go/lib/libcredentio_c.so" ]; then
+            cp "go/lib/libcredentio_c.so" "release-libs/libcredentio_c-linux-amd64.so"
+          fi
+          if [ ! -f "release-libs/libcredentio_c-linux-amd64.so" ] && ls wheelhouse/*.whl 1>/dev/null 2>&1; then
+            python -m zipfile -e $(ls wheelhouse/*.whl | head -1) /tmp/whl-extract
+            find /tmp/whl-extract -name "libcredentio_c*.so*" -exec cp {} release-libs/libcredentio_c-linux-amd64.so \;
+          fi
 
       - name: Upload Native Libs
         uses: actions/upload-artifact@v4
