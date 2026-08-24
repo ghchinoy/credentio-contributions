@@ -131,7 +131,7 @@ jobs:
             curl -sLo /usr/local/bin/bazel https://github.com/bazelbuild/bazelisk/releases/latest/download/bazelisk-linux-amd64 &&
             chmod +x /usr/local/bin/bazel &&
             export CREDENTIO_BAZEL_STARTUP_FLAGS="--noworkspace_rc" &&
-            export CREDENTIO_EXTRA_BAZEL_FLAGS="--repo_env=CC=gcc --repo_env=CXX=g++ --cxxopt=-std=c++20 --cxxopt=-D__has_feature(x)=1" &&
+            export CREDENTIO_EXTRA_BAZEL_FLAGS="--repo_env=CC=gcc --repo_env=CXX=g++ --cxxopt=-std=c++20 --cxxopt=-D__has_feature(x)=0" &&
             ./scripts/build-shared-lib.sh
           CIBW_BEFORE_ALL_MACOS: ./scripts/build-shared-lib.sh
           CIBW_ENVIRONMENT: "CREDENTIO_GIT_URL=https://mediaprovenance.googlesource.com/credentio CREDENTIO_SHA=4ac69fc58256d3871e765f615254373e19e250e9"
