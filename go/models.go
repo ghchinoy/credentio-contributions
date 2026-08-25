@@ -185,6 +185,11 @@ func ParseCrJSON(rawJSON, mediaType string, elapsedSeconds, coreSeconds float64)
 	var active *Manifest
 	var ingredients []Manifest
 	if len(manifests) > 0 {
+		for i := range manifests {
+			if manifests[i].Format == "" && mediaType != "" {
+				manifests[i].Format = mediaType
+			}
+		}
 		active = &manifests[0]
 		if len(manifests) > 1 {
 			ingredients = manifests[1:]
@@ -244,20 +249,12 @@ func mapManifest(dict map[string]interface{}, defaultLabel string) Manifest {
 	if genObj, ok := claimDict["claim_generator_info"].(map[string]interface{}); ok {
 		name, _ := genObj["name"].(string)
 		ver, _ := genObj["version"].(string)
-		if name != "" && ver != "" {
-			claimGenerator = fmt.Sprintf("%s %s", name, ver)
-		} else {
-			claimGenerator = name
-		}
+		claimGenerator = formatClaimGenerator(name, ver)
 	} else if genList, ok := claimDict["claim_generator_info"].([]interface{}); ok && len(genList) > 0 {
 		if first, ok := genList[0].(map[string]interface{}); ok {
 			name, _ := first["name"].(string)
 			ver, _ := first["version"].(string)
-			if name != "" && ver != "" {
-				claimGenerator = fmt.Sprintf("%s %s", name, ver)
-			} else {
-				claimGenerator = name
-			}
+			claimGenerator = formatClaimGenerator(name, ver)
 		}
 	}
 	if claimGenerator == "" {
@@ -265,11 +262,7 @@ func mapManifest(dict map[string]interface{}, defaultLabel string) Manifest {
 			if first, ok := genList[0].(map[string]interface{}); ok {
 				name, _ := first["name"].(string)
 				ver, _ := first["version"].(string)
-				if name != "" && ver != "" {
-					claimGenerator = fmt.Sprintf("%s %s", name, ver)
-				} else {
-					claimGenerator = name
-				}
+				claimGenerator = formatClaimGenerator(name, ver)
 			}
 		}
 	}
@@ -424,7 +417,15 @@ func summarizeAssertion(label string, value interface{}) string {
 		for _, item := range actions {
 			if aDict, ok := item.(map[string]interface{}); ok {
 				if act, ok := aDict["action"].(string); ok {
-					names = append(names, act)
+					var extra string
+					if dst, ok := aDict["digitalSourceType"].(string); ok && dst != "" {
+						parts := strings.Split(dst, "/")
+						extra = fmt.Sprintf(" (%s)", parts[len(parts)-1])
+					} else if dst, ok := aDict["digital_source_type"].(string); ok && dst != "" {
+						parts := strings.Split(dst, "/")
+						extra = fmt.Sprintf(" (%s)", parts[len(parts)-1])
+					}
+					names = append(names, act+extra)
 				}
 			}
 		}
@@ -504,4 +505,20 @@ func summarizeAssertion(label string, value interface{}) string {
 	}
 
 	return ""
+}
+
+func cleanGeneratorVersion(ver string) string {
+	parts := strings.Split(ver, ":")
+	if len(parts) == 2 && parts[0] != "" && parts[0] == parts[1] {
+		return parts[0]
+	}
+	return ver
+}
+
+func formatClaimGenerator(name, ver string) string {
+	cleanedVer := cleanGeneratorVersion(ver)
+	if name != "" && cleanedVer != "" {
+		return fmt.Sprintf("%s %s", name, cleanedVer)
+	}
+	return name
 }

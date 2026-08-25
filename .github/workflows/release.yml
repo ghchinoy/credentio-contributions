@@ -199,6 +199,14 @@ jobs:
           draft: false
           prerelease: ${{ steps.prerelease_check.outputs.is_prerelease == 'true' }}
 
+      - name: Auto-tag Go Sub-module
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          GO_TAG="go/${{ github.ref_name }}"
+          echo "Creating and pushing Go module tag: ${GO_TAG}"
+          git tag -f "${GO_TAG}" "${{ github.sha }}"
+          git push -f origin "${GO_TAG}"
+
       - name: Publish to PyPI
         if: ${{ (github.event_name == 'push' && steps.prerelease_check.outputs.is_prerelease == 'false') || github.event.inputs.publish_pypi == 'true' }}
         uses: pypa/gh-action-pypi-publish@release/v1

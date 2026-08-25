@@ -86,6 +86,17 @@ public enum CredentioCrjsonMapper {
             }
         }
 
+        if !mediaType.isEmpty {
+            if active?.format == nil || active?.format?.isEmpty == true {
+                active?.format = mediaType
+            }
+            for i in ingredients.indices {
+                if ingredients[i].format == nil || ingredients[i].format?.isEmpty == true {
+                    ingredients[i].format = mediaType
+                }
+            }
+        }
+
         let validationResults = root["validation_results"] as? [String: Any]
         let specVersion = root["spec_version"] as? String
             ?? validationResults?["spec_version"] as? String
@@ -111,16 +122,24 @@ public enum CredentioCrjsonMapper {
         let format = dict["format"] as? String
         let isUpdateManifest = dict["is_update_manifest"] as? Bool ?? false
 
-        let claimDict = dict["claim"] as? [String: Any]
+        let claimDict = (dict["claim"] as? [String: Any])
+            ?? (dict["claim.v2"] as? [String: Any])
 
         // Claim generator extraction
         var claimGenerator: String?
-        let genInfoList = (claimDict?["claim_generator_info"] as? [[String: Any]])
-            ?? (dict["claim_generator_info"] as? [[String: Any]])
-        if let first = genInfoList?.first {
-            let name = first["name"] as? String
-            let version = first["version"] as? String
+        if let genDict = (claimDict?["claim_generator_info"] as? [String: Any])
+            ?? (dict["claim_generator_info"] as? [String: Any]) {
+            let name = genDict["name"] as? String
+            let version = cleanGeneratorVersion(genDict["version"] as? String)
             claimGenerator = [name, version].compactMap { $0 }.joined(separator: " ")
+        } else {
+            let genInfoList = (claimDict?["claim_generator_info"] as? [[String: Any]])
+                ?? (dict["claim_generator_info"] as? [[String: Any]])
+            if let first = genInfoList?.first {
+                let name = first["name"] as? String
+                let version = cleanGeneratorVersion(first["version"] as? String)
+                claimGenerator = [name, version].compactMap { $0 }.joined(separator: " ")
+            }
         }
         if claimGenerator == nil {
             claimGenerator = (claimDict?["claim_generator"] as? String) ?? (dict["claim_generator"] as? String)
@@ -130,6 +149,7 @@ public enum CredentioCrjsonMapper {
         let sigDict = (claimDict?["signature_info"] as? [String: Any])
             ?? (dict["signature_info"] as? [String: Any])
             ?? (claimDict?["signature"] as? [String: Any])
+            ?? (dict["signature"] as? [String: Any])
         let signature = mapSignature(sigDict)
 
         // Assertions extraction
@@ -157,6 +177,12 @@ public enum CredentioCrjsonMapper {
             statuses = mapValidationStatuses(statusList)
         } else if let statusList = dict["validation_status"] as? [[String: Any]] {
             statuses = mapValidationStatuses(statusList)
+        } else if let valResults = dict["validationResults"] as? [String: Any] {
+            for cat in ["failure", "informational", "success"] {
+                if let catList = valResults[cat] as? [[String: Any]] {
+                    statuses.append(contentsOf: mapValidationStatuses(catList, category: cat))
+                }
+            }
         }
 
         return Manifest(
@@ -173,15 +199,27 @@ public enum CredentioCrjsonMapper {
 
     private static func mapSignature(_ dict: [String: Any]?) -> SignatureInfo? {
         guard let dict else { return nil }
+        var issuer = dict["issuer"] as? String ?? dict["common_name"] as? String
+        let certInfo = dict["certificateInfo"] as? [String: Any]
+        if issuer == nil, let issObj = certInfo?["issuer"] as? [String: Any] {
+            issuer = issObj["CN"] as? String
+        }
+        var certSummary = dict["cert_serial_number"] as? String
+        if certSummary == nil {
+            certSummary = certInfo?["serialNumber"] as? String
+        }
         var time: Date?
-        if let timeString = dict["time"] as? String ?? dict["date_time"] as? String {
+        let timeString = dict["time"] as? String
+            ?? dict["date_time"] as? String
+            ?? (dict["timeStampInfo"] as? [String: Any])?["timestamp"] as? String
+        if let timeString {
             time = ISO8601DateFormatter().date(from: timeString)
         }
         return SignatureInfo(
-            issuer: dict["issuer"] as? String ?? dict["common_name"] as? String,
+            issuer: issuer,
             algorithm: dict["alg"] as? String ?? dict["algorithm"] as? String,
             time: time,
-            certChainSummary: dict["cert_serial_number"] as? String
+            certChainSummary: certSummary
         )
     }
 
@@ -190,7 +228,15 @@ public enum CredentioCrjsonMapper {
 
         // 1. Actions assertion
         if let actions = dict["actions"] as? [[String: Any]] {
-            let names = actions.compactMap { $0["action"] as? String }
+            let names = actions.compactMap { actionDict -> String? in
+                guard let action = actionDict["action"] as? String else { return nil }
+                if let dst = (actionDict["digitalSourceType"] as? String) ?? (actionDict["digital_source_type"] as? String),
+                   !dst.isEmpty {
+                    let cleanType = dst.split(separator: "/").last.map(String.init) ?? dst
+                    return "\(action) (\(cleanType))"
+                }
+                return action
+            }
             if !names.isEmpty { return names.joined(separator: ", ") }
         }
 
@@ -251,14 +297,20 @@ public enum CredentioCrjsonMapper {
         return nil
     }
 
-    private static func mapValidationStatuses(_ array: [[String: Any]]) -> [ValidationStatus] {
+    private static func mapValidationStatuses(_ array: [[String: Any]], category: String? = nil) -> [ValidationStatus] {
         array.compactMap { entry in
             guard let code = entry["code"] as? String else { return nil }
+            var sev = severity(forCode: code)
+            if category == "failure" {
+                sev = .error
+            } else if category == "informational" || category == "success" {
+                sev = .info
+            }
             return ValidationStatus(
                 code: code,
                 explanation: entry["explanation"] as? String,
                 url: entry["url"] as? String,
-                severity: severity(forCode: code)
+                severity: sev
             )
         }
     }
@@ -280,5 +332,14 @@ public enum CredentioCrjsonMapper {
             return .info
         }
         return .warning
+    }
+
+    private static func cleanGeneratorVersion(_ ver: String?) -> String? {
+        guard let ver else { return nil }
+        let parts = ver.split(separator: ":").map(String.init)
+        if parts.count == 2, !parts[0].isEmpty, parts[0] == parts[1] {
+            return parts[0]
+        }
+        return ver
     }
 }

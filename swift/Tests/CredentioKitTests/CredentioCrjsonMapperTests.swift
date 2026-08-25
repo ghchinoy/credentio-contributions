@@ -270,4 +270,89 @@ final class CredentioCrjsonMapperTests: XCTestCase {
         let aiInfo = active.assertions.first(where: { $0.label == "c2pa.ai_generative_info" })
         XCTAssertEqual(aiInfo?.summary, "model: Imagen 3.0")
     }
+
+    func testPortlandiaProbeMP4() {
+        let rawPayload = """
+        {
+            "@context": ["https://c2pa.org/crjson/crJSON.schema.json"],
+            "jsonGenerator": {"name": "Google C2PA Toolkit", "version": "0.0.1"},
+            "manifests": [
+                {
+                    "label": "urn:c2pa:6e34afa9-5f49-dac3-93e2-41f4dc0fa78b",
+                    "isUpdateManifest": false,
+                    "isCompressedManifest": false,
+                    "claim.v2": {
+                        "claim_generator_info": {
+                            "name": "Google C2PA Core Generator Library",
+                            "version": "969395858:969395858"
+                        },
+                        "instanceID": "3c9d9b36-4893-30c3-1ddd-4ef455a89d10"
+                    },
+                    "signature": {
+                        "algorithm": "ES256",
+                        "certificateInfo": {
+                            "issuer": {
+                                "C": "US",
+                                "CN": "TESTING Google C2PA Qual Media Services ICA G1",
+                                "O": "TESTING Google LLC"
+                            },
+                            "serialNumber": "ac047db08d82cb69298367b6ade5c7a987b75f"
+                        },
+                        "timeStampInfo": {
+                            "timestamp": "2026-08-23T16:55:41+00:00"
+                        }
+                    },
+                    "assertions": {
+                        "c2pa.actions.v2": {
+                            "actions": [
+                                {
+                                    "action": "c2pa.created",
+                                    "digitalSourceType": "http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia"
+                                },
+                                {
+                                    "action": "c2pa.edited",
+                                    "digitalSourceType": "http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia"
+                                }
+                            ]
+                        },
+                        "c2pa.hash.bmff.v3": {
+                            "alg": "sha256",
+                            "hash": "b64'OhHVqHoQ78L854774ttX0O4SxB+jvLUfiGHSu3WbDbI='"
+                        }
+                    },
+                    "validationResults": {
+                        "success": [
+                            {"code": "claimSignature.validated"}
+                        ]
+                    }
+                }
+            ]
+        }
+        """
+
+        let report = CredentioCrjsonMapper.mapReport(
+            json: rawPayload,
+            mediaType: "video/mp4",
+            elapsed: .zero
+        )
+
+        XCTAssertTrue(report.hasCredentials)
+        guard let active = report.activeManifest else {
+            XCTFail("Missing active manifest")
+            return
+        }
+
+        // Verify generator version deduplication (969395858:969395858 -> 969395858)
+        XCTAssertEqual(active.claimGenerator, "Google C2PA Core Generator Library 969395858")
+
+        // Verify format fallback to report mediaType
+        XCTAssertEqual(active.format, "video/mp4")
+
+        // Verify actions summary with digitalSourceType
+        let actions = active.assertions.first(where: { $0.label == "c2pa.actions.v2" })
+        XCTAssertEqual(actions?.summary, "c2pa.created (trainedAlgorithmicMedia), c2pa.edited (trainedAlgorithmicMedia)")
+
+        // Verify signature issuer
+        XCTAssertEqual(active.signature?.issuer, "TESTING Google C2PA Qual Media Services ICA G1")
+    }
 }

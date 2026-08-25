@@ -148,3 +148,77 @@ def test_assertion_summaries():
     assert summaries["c2pa.digital_source_type"] == "trainedAlgorithmicMedia"
     assert summaries["c2pa.ai_generative_info"] == "model: Imagen 3.0"
 
+
+def test_portlandia_probe_mp4():
+    raw_payload = """
+    {
+        "@context": ["https://c2pa.org/crjson/crJSON.schema.json"],
+        "jsonGenerator": {"name": "Google C2PA Toolkit", "version": "0.0.1"},
+        "manifests": [
+            {
+                "label": "urn:c2pa:6e34afa9-5f49-dac3-93e2-41f4dc0fa78b",
+                "isUpdateManifest": false,
+                "isCompressedManifest": false,
+                "claim.v2": {
+                    "claim_generator_info": {
+                        "name": "Google C2PA Core Generator Library",
+                        "version": "969395858:969395858"
+                    },
+                    "instanceID": "3c9d9b36-4893-30c3-1ddd-4ef455a89d10"
+                },
+                "signature": {
+                    "algorithm": "ES256",
+                    "certificateInfo": {
+                        "issuer": {
+                            "C": "US",
+                            "CN": "TESTING Google C2PA Qual Media Services ICA G1",
+                            "O": "TESTING Google LLC"
+                        },
+                        "serialNumber": "ac047db08d82cb69298367b6ade5c7a987b75f"
+                    },
+                    "timeStampInfo": {
+                        "timestamp": "2026-08-23T16:55:41+00:00"
+                    }
+                },
+                "assertions": {
+                    "c2pa.actions.v2": {
+                        "actions": [
+                            {
+                                "action": "c2pa.created",
+                                "digitalSourceType": "http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia"
+                            },
+                            {
+                                "action": "c2pa.edited",
+                                "digitalSourceType": "http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia"
+                            }
+                        ]
+                    },
+                    "c2pa.hash.bmff.v3": {
+                        "alg": "sha256",
+                        "hash": "b64'OhHVqHoQ78L854774ttX0O4SxB+jvLUfiGHSu3WbDbI='"
+                    }
+                },
+                "validationResults": {
+                    "success": [
+                        {"code": "claimSignature.validated"}
+                    ]
+                }
+            }
+        ]
+    }
+    """
+    report = parse_crjson(raw_json=raw_payload, media_type="video/mp4")
+    assert report.has_credentials is True
+    assert report.badge == BadgeState.SIGNED
+
+    active = report.active_manifest
+    assert active is not None
+    assert active.claim_generator == "Google C2PA Core Generator Library 969395858"
+    assert active.format == "video/mp4"
+
+    summaries = {a.label: a.summary for a in active.assertions}
+    assert summaries["c2pa.actions.v2"] == "c2pa.created (trainedAlgorithmicMedia), c2pa.edited (trainedAlgorithmicMedia)"
+    assert active.signature is not None
+    assert active.signature.issuer == "TESTING Google C2PA Qual Media Services ICA G1"
+
+

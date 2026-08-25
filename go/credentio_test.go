@@ -270,3 +270,117 @@ func TestAssertionSummaries(t *testing.T) {
 		t.Errorf("expected AI info summary %q, got %q", expectedAI, aiInfoSummary)
 	}
 }
+
+func TestParseCrJSON_PortlandiaProbeMP4(t *testing.T) {
+	const rawPayload = `
+	{
+		"@context": ["https://c2pa.org/crjson/crJSON.schema.json"],
+		"jsonGenerator": {"name": "Google C2PA Toolkit", "version": "0.0.1"},
+		"manifests": [
+			{
+				"label": "urn:c2pa:6e34afa9-5f49-dac3-93e2-41f4dc0fa78b",
+				"isUpdateManifest": false,
+				"isCompressedManifest": false,
+				"claim.v2": {
+					"claim_generator_info": {
+						"name": "Google C2PA Core Generator Library",
+						"version": "969395858:969395858"
+					},
+					"instanceID": "3c9d9b36-4893-30c3-1ddd-4ef455a89d10"
+				},
+				"signature": {
+					"algorithm": "ES256",
+					"certificateInfo": {
+						"issuer": {
+							"C": "US",
+							"CN": "TESTING Google C2PA Qual Media Services ICA G1",
+							"O": "TESTING Google LLC"
+						},
+						"serialNumber": "ac047db08d82cb69298367b6ade5c7a987b75f"
+					},
+					"timeStampInfo": {
+						"timestamp": "2026-08-23T16:55:41+00:00"
+					}
+				},
+				"assertions": {
+					"c2pa.actions.v2": {
+						"actions": [
+							{
+								"action": "c2pa.created",
+								"digitalSourceType": "http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia"
+							},
+							{
+								"action": "c2pa.edited",
+								"digitalSourceType": "http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia"
+							}
+						]
+					},
+					"c2pa.hash.bmff.v3": {
+						"alg": "sha256",
+						"hash": "b64'OhHVqHoQ78L854774ttX0O4SxB+jvLUfiGHSu3WbDbI='"
+					}
+				},
+				"validationResults": {
+					"success": [
+						{"code": "claimSignature.validated"},
+						{"code": "assertion.bmffHash.match"}
+					],
+					"informational": [
+						{"code": "signingCredential.trusted"}
+					]
+				}
+			}
+		]
+	}
+	`
+
+	report, err := ParseCrJSON(rawPayload, "video/mp4", 0.012, 0.010)
+	if err != nil {
+		t.Fatalf("unexpected error parsing crJSON: %v", err)
+	}
+
+	if !report.HasCredentials {
+		t.Errorf("expected HasCredentials to be true")
+	}
+	if report.Badge() != BadgeSigned {
+		t.Errorf("expected badge to be %q, got %q", BadgeSigned, report.Badge())
+	}
+
+	guard := report.ActiveManifest
+	if guard == nil {
+		t.Fatalf("expected ActiveManifest not to be nil")
+	}
+
+	// Verify generator version deduplication (969395858:969395858 -> 969395858)
+	expectedGen := "Google C2PA Core Generator Library 969395858"
+	if guard.ClaimGenerator != expectedGen {
+		t.Errorf("expected generator %q, got %q", expectedGen, guard.ClaimGenerator)
+	}
+
+	// Verify format fallback to report mediaType
+	if guard.Format != "video/mp4" {
+		t.Errorf("expected format 'video/mp4', got %q", guard.Format)
+	}
+
+	// Verify actions summary with digitalSourceType
+	var actionsSummary string
+	for _, a := range guard.Assertions {
+		if a.Label == "c2pa.actions.v2" {
+			actionsSummary = a.Summary
+		}
+	}
+	expectedActions := "c2pa.created (trainedAlgorithmicMedia), c2pa.edited (trainedAlgorithmicMedia)"
+	if actionsSummary != expectedActions {
+		t.Errorf("expected actions summary %q, got %q", expectedActions, actionsSummary)
+	}
+
+	// Verify signer issuer
+	if guard.Signature == nil || guard.Signature.Issuer != "TESTING Google C2PA Qual Media Services ICA G1" {
+		t.Errorf("unexpected signature issuer: %+v", guard.Signature)
+	}
+
+	// Verify validation statuses count
+	if len(guard.ValidationStatuses) != 3 {
+		t.Errorf("expected 3 validation statuses, got %d", len(guard.ValidationStatuses))
+	}
+}

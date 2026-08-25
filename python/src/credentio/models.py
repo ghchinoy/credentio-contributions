@@ -154,6 +154,11 @@ def parse_crjson(
             if isinstance(m_dict, dict):
                 manifests.append(_map_manifest(m_dict, default_label=label))
 
+    if media_type:
+        for m in manifests:
+            if not m.format:
+                m.format = media_type
+
     active = manifests[0] if manifests else None
     ingredients = manifests[1:] if len(manifests) > 1 else []
 
@@ -174,42 +179,66 @@ def parse_crjson(
     )
 
 
+def _clean_generator_version(ver: Optional[str]) -> Optional[str]:
+    if not ver or not isinstance(ver, str):
+        return ver
+    parts = ver.split(":")
+    if len(parts) == 2 and parts[0] and parts[0] == parts[1]:
+        return parts[0]
+    return ver
+
+
 def _map_manifest(dict_: Dict[str, Any], default_label: str) -> Manifest:
     label = dict_.get("label", default_label)
     title = dict_.get("title")
     format_ = dict_.get("format")
     is_update = dict_.get("is_update_manifest", False)
 
-    claim_dict = dict_.get("claim", {})
+    claim_dict = dict_.get("claim") or dict_.get("claim.v2") or {}
 
     # Generator extraction
     claim_generator = None
-    gen_list = claim_dict.get("claim_generator_info") or dict_.get("claim_generator_info")
-    if gen_list and isinstance(gen_list, list) and len(gen_list) > 0:
-        first = gen_list[0]
+    gen_info = claim_dict.get("claim_generator_info") or dict_.get("claim_generator_info")
+    if isinstance(gen_info, dict):
+        name = gen_info.get("name")
+        ver = _clean_generator_version(gen_info.get("version"))
+        claim_generator = " ".join(filter(None, [name, ver])) or None
+    elif isinstance(gen_info, list) and len(gen_info) > 0:
+        first = gen_info[0]
         if isinstance(first, dict):
             name = first.get("name")
-            ver = first.get("version")
+            ver = _clean_generator_version(first.get("version"))
             claim_generator = " ".join(filter(None, [name, ver])) or None
     if not claim_generator:
         claim_generator = claim_dict.get("claim_generator") or dict_.get("claim_generator")
 
     # Signature
-    sig_dict = claim_dict.get("signature_info") or dict_.get("signature_info") or claim_dict.get("signature")
+    sig_dict = claim_dict.get("signature_info") or dict_.get("signature_info") or claim_dict.get("signature") or dict_.get("signature")
     signature = None
     if isinstance(sig_dict, dict):
+        issuer = sig_dict.get("issuer") or sig_dict.get("common_name")
+        cert_info = sig_dict.get("certificateInfo")
+        if not issuer and isinstance(cert_info, dict):
+            iss_obj = cert_info.get("issuer")
+            if isinstance(iss_obj, dict):
+                issuer = iss_obj.get("CN")
+        cert_summary = sig_dict.get("cert_serial_number")
+        if not cert_summary and isinstance(cert_info, dict):
+            cert_summary = cert_info.get("serialNumber")
         time_val = None
         time_str = sig_dict.get("time") or sig_dict.get("date_time")
+        if not time_str and isinstance(sig_dict.get("timeStampInfo"), dict):
+            time_str = sig_dict["timeStampInfo"].get("timestamp")
         if time_str:
             try:
                 time_val = datetime.fromisoformat(time_str.replace("Z", "+00:00"))
             except Exception:
                 time_val = None
         signature = SignatureInfo(
-            issuer=sig_dict.get("issuer") or sig_dict.get("common_name"),
+            issuer=issuer,
             algorithm=sig_dict.get("alg") or sig_dict.get("algorithm"),
             time=time_val,
-            cert_chain_summary=sig_dict.get("cert_serial_number")
+            cert_chain_summary=cert_summary
         )
 
     # Assertions
@@ -246,6 +275,27 @@ def _map_manifest(dict_: Dict[str, Any], default_label: str) -> Manifest:
                         severity=_classify_severity(code)
                     )
                 )
+    elif isinstance(dict_.get("validationResults"), dict):
+        val_results = dict_["validationResults"]
+        for cat in ("failure", "informational", "success"):
+            cat_list = val_results.get(cat)
+            if isinstance(cat_list, list):
+                for item in cat_list:
+                    if isinstance(item, dict) and "code" in item:
+                        code = item["code"]
+                        sev = _classify_severity(code)
+                        if cat == "failure":
+                            sev = Severity.ERROR
+                        elif cat in ("informational", "success"):
+                            sev = Severity.INFO
+                        statuses.append(
+                            ValidationStatus(
+                                code=code,
+                                explanation=item.get("explanation"),
+                                url=item.get("url"),
+                                severity=sev
+                            )
+                        )
 
     return Manifest(
         label=label,
@@ -266,7 +316,16 @@ def _summarize_assertion(label: str, value: Any) -> Optional[str]:
     # 1. Actions assertion
     actions = value.get("actions")
     if isinstance(actions, list):
-        names = [a.get("action") for a in actions if isinstance(a, dict) and a.get("action")]
+        names = []
+        for a in actions:
+            if isinstance(a, dict) and a.get("action"):
+                action = a["action"]
+                dst = a.get("digitalSourceType") or a.get("digital_source_type")
+                if dst and isinstance(dst, str):
+                    clean_dst = dst.split("/")[-1]
+                    names.append(f"{action} ({clean_dst})")
+                else:
+                    names.append(action)
         if names:
             return ", ".join(names)
 
