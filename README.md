@@ -221,6 +221,7 @@ make docs-serve
 
 - [Developer Guide](docs/developers_guide.md): Comprehensive guide to the C-ABI bridge, XCFramework build, and architecture.
 - [ADR-0001: Shared C-ABI Strategy](docs/adr/0001-shared-c-abi-bindings.md): Architectural decision record for multi-language FFI.
+- [Maintenance & Drift Detection](https://ghchinoy.github.io/credentio-contributions/maintenance/): Authoritative baseline pinning (`.credentio-pin`), `make check-drift`, and automated CI tracking.
 
 ---
 

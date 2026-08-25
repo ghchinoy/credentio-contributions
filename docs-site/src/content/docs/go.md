@@ -9,9 +9,21 @@ The `github.com/ghchinoy/credentio-contributions/go` package provides native `cg
 
 ## 1. Installation & Native Library Setup
 
+### Step 1: Add Go Module Dependency
+
+Add the Go package to your `go.mod`:
+
+```bash
+go get github.com/ghchinoy/credentio-contributions/go@v0.1.2
+```
+
+> **Note on Sub-module Versioning:** Release workflows automatically publish sub-module tags matching `go/vX.Y.Z` on GitHub, allowing standard `go get` commands to resolve without manual multi-module path replacement.
+
+### Step 2: Native Library Setup
+
 Because Go interacts with Credentio via `cgo`, the package requires `libcredentio_c.dylib` (macOS) or `libcredentio_c.so` (Linux).
 
-You can install the prebuilt native library automatically:
+You can install the prebuilt native library automatically from the latest release:
 
 ```bash
 make fetch-lib

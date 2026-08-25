@@ -79,3 +79,15 @@ Credentio natively extracts and validates Content Credentials embedded within:
 | **Image** | `.avif`, `.dng`, `.gif`, `.heic`, `.heif`, `.jpeg`, `.jpg`, `.png`, `.tif`, `.tiff`, `.webp` |
 | **Video & Audio** | `.avi`, `.m4a`, `.mov`, `.mp3`, `.mp4`, `.wav`, `.flac` |
 | **Document** | `.pdf`, `.docx`, `.pptx`, `.xlsx` |
+
+---
+
+## 5. Schema Resilience & Google Toolkit v2 Support
+
+Language bindings in this repository automatically normalize across diverse C2PA JSON generator schemas:
+
+- **C2PA v1 and v2 Schemas:** Accommodates both classic `claim` dictionaries and modern `claim.v2` schemas with nested `instanceID` and `claim_generator_info`.
+- **Claim Generator Deduplication:** Normalizes generator strings with duplicated version tokens (such as `Library 969395858:969395858` cleanly collapsing to `Library 969395858`).
+- **Media Format Fallback:** Falls back `Manifest.Format` to the detected asset media type (`video/mp4`, `image/jpeg`) when omitted from raw manifest structures.
+- **AI Provenance in Actions:** Extracts `digitalSourceType` (such as `trainedAlgorithmicMedia` or SynthID watermarking) directly into human-readable action summaries.
+- **Categorized Validation Results:** Normalizes grouped `validationResults` (`success`, `informational`, `failure`) and certificate chains (`certificateInfo.issuer.CN`).

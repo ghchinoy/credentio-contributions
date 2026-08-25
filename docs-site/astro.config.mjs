@@ -58,6 +58,7 @@ export default defineConfig({
 					items: [
 						{ label: 'C-ABI Architecture', slug: 'architecture' },
 						{ label: 'Contributing & Upstreaming', slug: 'contributing' },
+						{ label: 'Maintenance & Drift Detection', slug: 'maintenance' },
 					],
 				},
 			],
