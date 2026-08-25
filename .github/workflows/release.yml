@@ -202,6 +202,7 @@ jobs:
       - name: Publish to PyPI
         if: ${{ (github.event_name == 'push' && steps.prerelease_check.outputs.is_prerelease == 'false') || github.event.inputs.publish_pypi == 'true' }}
         uses: pypa/gh-action-pypi-publish@release/v1
+        continue-on-error: true
         with:
           packages-dir: dist-release/
           skip-existing: true
