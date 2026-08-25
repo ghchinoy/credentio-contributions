@@ -21,7 +21,7 @@ struct CredentioCLI: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "credentio-cli",
         abstract: "Google Credentio C2PA Content Credentials Command-Line Validator",
-        version: "0.1.0",
+        version: "0.1.1",
         subcommands: [Validate.self],
         defaultSubcommand: Validate.self
     )
