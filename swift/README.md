@@ -12,7 +12,7 @@ High-performance native Swift bindings for [Google Credentio](https://mediaprove
 - **App Sandbox Compliant**: In-process engine requires zero child subprocesses or sandbox entitlements.
 - **Pure Swift Fallback**: Compiles immediately with zero C++ toolchain requirements for CLI/crJSON workflows.
 - **Built-in Format Detection**: `SupportedFormats` helper for image, video, audio, and document validation.
-- **Cross-platform Apple support**: macOS 14.0+ and iOS 16.0+.
+- **Cross-platform Apple support**: macOS 14.0+ and iOS 16.0+ (prebuilt binary targets macOS arm64; other platforms build from source).
 
 ---
 
@@ -35,6 +35,8 @@ targets: [
     )
 ]
 ```
+
+> **Note on Prebuilt XCFramework:** The pre-compiled release binary currently targets **macOS (arm64)**. For Intel Mac (x86_64) or iOS architectures, compile the static XCFramework from source using `make build-swift`.
 
 ### 2. Local Source Build (Optional)
 

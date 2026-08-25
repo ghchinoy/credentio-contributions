@@ -23,7 +23,7 @@ Or compile the native library from source using Bazel:
 make build-lib
 ```
 
-> **Note on CGO:** Building downstream applications or running tests requires `CGO_ENABLED=1`. On macOS, dynamic linking rpaths are embedded directly in the package LDFLAGS, so no manual `DYLD_LIBRARY_PATH` configuration is necessary.
+> **Note on CGO & Prebuilt Binaries:** Pre-compiled release libraries currently target **macOS (arm64)** and **Linux (x86_64)**. Building downstream applications or running tests requires `CGO_ENABLED=1`. On macOS, dynamic linking rpaths are embedded directly in the package LDFLAGS, so no manual `DYLD_LIBRARY_PATH` configuration is necessary.
 
 ---
 

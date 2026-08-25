@@ -32,7 +32,7 @@ This repository provides language bindings built on top of a unified C-ABI bridg
 
 - 🐍 **Python (`credentio`)**: `cffi`-based library with typed dataclasses, context managers, and zero runtime dependencies.
 - 🐹 **Go (`github.com/ghchinoy/credentio-contributions/go`)**: `cgo`-based package with thread-safe validators, `encoding/json` models, and functional options.
-- 🍏 **Swift (`CredentioKit`)**: Actor-isolated Swift 6 package for macOS 14+ and iOS 16+ via a native static XCFramework.
+- 🍏 **Swift (`CredentioKit`)**: Actor-isolated Swift 6 package supporting macOS 14+ and iOS 16+ (prebuilt binaries currently ship macOS arm64; other targets build from source).
 
 ---
 
@@ -45,6 +45,8 @@ This repository provides language bindings built on top of a unified C-ABI bridg
   - Python 3.9+ with `pip`
   - Go 1.21+
   - Xcode 16+ (for Swift / macOS / iOS builds)
+
+> **Note on Prebuilt Binaries:** Pre-compiled release binaries currently target **macOS (arm64)** and **Linux (x86_64)**. Other architectures (such as Intel Mac, Linux aarch64, or iOS devices) can be compiled directly from source using the prerequisites above.
 
 ---
 
@@ -203,9 +205,9 @@ See the [CLI Tutorial](https://ghchinoy.github.io/credentio-contributions/cli/) 
 
 Pre-compiled binary releases and source packages are distributed across multiple package ecosystems:
 
-- **Swift (CredentioKit):** Swift Package Manager remote binary package linking pre-compiled `CredentioC.xcframework` (macOS and iOS) from GitHub Releases.
-- **Python (credentio):** Binary wheels on PyPI and GitHub Releases with pre-bundled native shared libraries for macOS and Linux.
-- **Go:** Standard Go module with automated prebuilt library download via `make fetch-lib` or direct compilation against native libraries.
+- **Swift (CredentioKit):** Swift Package Manager remote binary package linking pre-compiled `CredentioC.xcframework` (macOS arm64 prebuilt today; iOS and universal binaries build from source).
+- **Python (credentio):** Pre-compiled binary wheels attached to GitHub Releases (macOS arm64 and Linux x86_64). PyPI registry publication is coming soon.
+- **Go:** Standard Go module with automated prebuilt library download via `make fetch-lib` (macOS arm64 and Linux x86_64) or direct compilation from source.
 
 ---
 

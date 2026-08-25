@@ -17,6 +17,8 @@ Follow this guide to set up Google Credentio, compile the native libraries, and 
   - Go 1.21+
   - Xcode 16+ (for Swift / Apple platforms)
 
+> **Note on Prebuilt Binaries:** Pre-compiled release binaries currently target **macOS (arm64)** and **Linux (x86_64)**. Other architectures (such as Intel Mac, Linux aarch64, or iOS devices) can be compiled directly from source using the prerequisites above.
+
 ---
 
 ## 2. Clone Repositories

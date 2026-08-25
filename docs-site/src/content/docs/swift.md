@@ -27,6 +27,8 @@ targets: [
 ]
 ```
 
+> **Note on Prebuilt XCFramework:** The pre-compiled release binary currently targets **macOS (arm64)**. For Intel Mac (x86_64) or iOS architectures, compile the static XCFramework from source using `make build-swift`.
+
 ### Pure Swift vs. Native In-Process Engine
 
 `CredentioKit` is designed to be modular:

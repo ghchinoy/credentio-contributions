@@ -4,9 +4,14 @@ High-performance Python bindings for [Google Credentio](https://mediaprovenance.
 
 ## Installation
 
+Pre-compiled binary wheels with bundled native libraries (macOS arm64 and Linux x86_64) are available on [GitHub Releases](https://github.com/ghchinoy/credentio-contributions/releases):
+
 ```bash
-pip install credentio
+# Download the matching wheel for your platform from GitHub Releases:
+pip install https://github.com/ghchinoy/credentio-contributions/releases/download/v0.1.0/credentio-0.1.0-cp311-cp311-macosx_14_0_arm64.whl
 ```
+
+> **Note:** Direct `pip install credentio` via PyPI is coming soon once Trusted Publishing is finalized.
 
 ## Quickstart
 

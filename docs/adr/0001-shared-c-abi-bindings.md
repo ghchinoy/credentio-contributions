@@ -1,4 +1,4 @@
-# 0001 — Shared C-ABI strategy for Python and Go bindings
+# 0001: Shared C-ABI strategy for Python and Go bindings
 
 - Status: Accepted
 - Date: 2026-08-22
