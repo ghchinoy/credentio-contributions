@@ -24,8 +24,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 OUTPUT_XCFRAMEWORK="${REPO_DIR}/swift/CredentioC.xcframework"
 
+PIN_FILE="${REPO_DIR}/.credentio-pin"
+DEFAULT_SHA="4ac69fc58256d3871e765f615254373e19e250e9"
+if [[ -f "${PIN_FILE}" ]]; then
+  DEFAULT_SHA="$(tr -d '[:space:]' < "${PIN_FILE}")"
+fi
+
 CREDENTIO_GIT_URL="${CREDENTIO_GIT_URL:-https://mediaprovenance.googlesource.com/credentio}"
-CREDENTIO_SHA="${CREDENTIO_SHA:-4ac69fc58256d3871e765f615254373e19e250e9}"
+CREDENTIO_SHA="${CREDENTIO_SHA:-${DEFAULT_SHA}}"
 
 echo "=== Building Credentio C-ABI static xcframework for Swift ==="
 

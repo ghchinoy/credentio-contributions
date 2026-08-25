@@ -1,4 +1,4 @@
-.PHONY: help build-lib build-swift fetch-lib python-install python-test go-test swift-test test docs-install docs-serve docs-build clean
+.PHONY: help build-lib build-swift fetch-lib check-drift python-install python-test go-test swift-test test docs-install docs-serve docs-build clean
 
 help: ## Show this help message
 	@echo "Usage: make [target]"
@@ -17,6 +17,10 @@ build-swift: ## Build native CredentioC.xcframework static library (for Swift)
 fetch-lib: ## Download prebuilt native library from GitHub Releases for Go & Python
 	@echo "Downloading prebuilt libcredentio_c binary..."
 	./scripts/fetch-prebuilt-lib.sh
+
+check-drift: ## Check if upstream Google Credentio has drifted from .credentio-pin
+	@echo "Checking for upstream Credentio drift..."
+	./scripts/check-credentio-drift.sh
 
 python-install: ## Install Python credentio package in editable mode
 	@echo "Installing Python package..."

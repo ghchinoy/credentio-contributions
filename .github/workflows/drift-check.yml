@@ -1,0 +1,113 @@
+# Copyright 2026 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: Upstream Drift Check
+
+on:
+  schedule:
+    # Run every Monday at 09:00 UTC
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check-drift:
+    name: Check Google Credentio Drift
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Drift Check Script
+        id: drift_check
+        run: |
+          set +e
+          OUTPUT="$(./scripts/check-credentio-drift.sh 2>&1)"
+          EXIT_CODE=$?
+          echo "output<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$OUTPUT" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+          echo "exit_code=${EXIT_CODE}" >> "$GITHUB_OUTPUT"
+
+          PINNED_SHA="$(tr -d '[:space:]' < .credentio-pin)"
+          UPSTREAM_SHA="$(git ls-remote https://mediaprovenance.googlesource.com/credentio refs/heads/main | awk '{print $1}')"
+          echo "pinned_sha=${PINNED_SHA}" >> "$GITHUB_OUTPUT"
+          echo "upstream_sha=${UPSTREAM_SHA}" >> "$GITHUB_OUTPUT"
+
+          echo "$OUTPUT"
+          exit 0
+
+      - name: Open or Update Tracking Issue on Drift
+        if: steps.drift_check.outputs.exit_code == '1'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pinned = "${{ steps.drift_check.outputs.pinned_sha }}";
+            const upstream = "${{ steps.drift_check.outputs.upstream_sha }}";
+            const compareUrl = `https://mediaprovenance.googlesource.com/credentio/+log/${pinned}..${upstream}`;
+            const issueTitle = `[Upstream Drift] Google Credentio main has advanced beyond pinned commit (${pinned.slice(0, 7)})`;
+            const issueLabel = 'upstream-drift';
+
+            const issueBody = [
+              '## Upstream Credentio Drift Detected',
+              '',
+              'The upstream Google Credentio repository (https://mediaprovenance.googlesource.com/credentio/) has new commits on its `main` branch.',
+              '',
+              `- **Pinned Commit:** \`${pinned}\` (in \`.credentio-pin\`)`,
+              `- **Upstream HEAD:** \`${upstream}\``,
+              `- **Compare Log:** [${pinned.slice(0, 7)}...${upstream.slice(0, 7)}](${compareUrl})`,
+              '',
+              '### Next Steps:',
+              '1. Review upstream commit log for breaking C++ API or schema changes.',
+              '2. Verify local builds and test suites across Python, Go, and Swift:',
+              '   ```bash',
+              '   make test',
+              '   make swift-test',
+              '   ```',
+              '3. Update the pin:',
+              '   ```bash',
+              `   echo "${upstream}" > .credentio-pin`,
+              '   ```',
+              '4. Commit and push the updated baseline.'
+            ].join('\n');
+
+            // Search for existing open drift issue
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: issueLabel
+            });
+
+            if (issues.data.length > 0) {
+              const existingIssue = issues.data[0];
+              console.log(`Updating existing drift issue #${existingIssue.number}`);
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existingIssue.number,
+                body: `### Drift Update (${new Date().toISOString()})\n\nUpstream HEAD is currently \`${upstream}\`.\n[Compare with pinned](${compareUrl})`
+              });
+            } else {
+              console.log('Creating new drift tracking issue');
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: issueTitle,
+                body: issueBody,
+                labels: [issueLabel]
+              });
+            }
