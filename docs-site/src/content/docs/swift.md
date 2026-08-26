@@ -15,7 +15,7 @@ Add `CredentioKit` to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/ghchinoy/credentio-contributions.git", from: "0.1.2")
+    .package(url: "https://github.com/ghchinoy/credentio-contributions.git", from: "0.1.3")
 ],
 targets: [
     .target(

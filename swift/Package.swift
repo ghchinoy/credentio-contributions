@@ -29,17 +29,19 @@ let nativeXcframeworkURL = customXCFPath.map { URL(fileURLWithPath: ($0 as NSStr
     ?? packageDir.appendingPathComponent("CredentioC.xcframework")
 
 // Prebuilt binary distribution release metadata
-let releaseVersion = "0.1.2"
+let releaseVersion = "0.1.3"
 let remoteChecksum = "a9c6fd4071e5a3d76bb3656160ffd2241b780fef5829d5d88eb9f4c4a2c479fb"
 let remoteURL = "https://github.com/ghchinoy/credentio-contributions/releases/download/v\(releaseVersion)/CredentioC.xcframework.zip"
 
 if FileManager.default.fileExists(atPath: nativeXcframeworkURL.path) {
     credentioKitDeps.append("CredentioC")
     credentioKitLinkerSettings.append(.linkedLibrary("c++"))
+    // SwiftPM requires package-relative path for downstream consumers; custom absolute paths only apply in root-package dev mode
+    let binaryPath = customXCFPath != nil ? nativeXcframeworkURL.path : "CredentioC.xcframework"
     extraTargets.append(
         .binaryTarget(
             name: "CredentioC",
-            path: nativeXcframeworkURL.path
+            path: binaryPath
         )
     )
 } else if ProcessInfo.processInfo.environment["CREDENTIO_SOURCE_ONLY"] == nil && remoteChecksum != "PLACEHOLDER_CHECKSUM" {
