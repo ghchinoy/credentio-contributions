@@ -222,3 +222,16 @@ def test_portlandia_probe_mp4():
     assert active.signature.issuer == "TESTING Google C2PA Qual Media Services ICA G1"
 
 
+def test_sniff_media_type():
+    from credentio.validator import sniff_media_type
+    assert sniff_media_type(b"ID3\x03\x00\x00\x00\x00;jGEOB") == "audio/mpeg"
+    assert sniff_media_type(b"fLaC\x00\x00\x00\x22") == "audio/flac"
+    assert sniff_media_type(b"RIFF\x24\x08\x00\x00WAVEfmt ") == "audio/wav"
+    assert sniff_media_type(b"\xff\xd8\xff\xe0\x00\x10JFIF") == "image/jpeg"
+    assert sniff_media_type(b"\x89PNG\r\n\x1a\n\x00\x00") == "image/png"
+    assert sniff_media_type(b"%PDF-1.7") == "application/pdf"
+    assert sniff_media_type(b"\x00\x00\x00\x1cftypavif\x00\x00\x00\x00") == "image/avif"
+    assert sniff_media_type(b"\x00\x00\x00\x18ftypmp42\x00\x00\x00\x00") == "video/mp4"
+
+
+

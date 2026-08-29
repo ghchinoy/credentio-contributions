@@ -21,9 +21,44 @@ from typing import Optional, Union
 from ._ffi import ffi, get_lib
 from .models import ProvenanceReport, parse_crjson
 
+def sniff_media_type(header: bytes) -> Optional[str]:
+    """Sniffs the true MIME type by inspecting leading magic bytes."""
+    if len(header) >= 3 and header[:3] == b"ID3":
+        return "audio/mpeg"
+    if len(header) >= 4 and header[:4] == b"fLaC":
+        return "audio/flac"
+    if len(header) >= 3 and header[:3] == b"\xff\xd8\xff":
+        return "image/jpeg"
+    if len(header) >= 8 and header[:8] == b"\x89PNG\r\n\x1a\n":
+        return "image/png"
+    if len(header) >= 6 and (header[:6] == b"GIF87a" or header[:6] == b"GIF89a"):
+        return "image/gif"
+    if len(header) >= 4 and header[:4] == b"%PDF":
+        return "application/pdf"
+    if len(header) >= 12 and header[:4] == b"RIFF":
+        form = header[8:12]
+        if form == b"WAVE":
+            return "audio/wav"
+        if form == b"WEBP":
+            return "image/webp"
+        if form == b"AVI ":
+            return "video/x-msvideo"
+    if len(header) >= 12 and header[4:8] == b"ftyp":
+        brand = header[8:12]
+        if brand in (b"avif", b"avis"):
+            return "image/avif"
+        if brand in (b"heic", b"heix", b"mif1"):
+            return "image/heic"
+        if brand == b"M4A ":
+            return "audio/mp4"
+        return "video/mp4"
+    return None
+
+
 class CredentioError(RuntimeError):
     """Raised when Credentio encounters an unrecoverable validation error."""
     pass
+
 
 class Validator:
     """Validator instance wrapping the native Google Credentio C-ABI."""
@@ -79,7 +114,14 @@ class Validator:
             raise FileNotFoundError(f"File not found: {path_str}")
 
         if not media_type:
-            media_type, _ = mimetypes.guess_type(path_str)
+            try:
+                with open(path_str, "rb") as f:
+                    header = f.read(32)
+                media_type = sniff_media_type(header)
+            except Exception:
+                media_type = None
+            if not media_type:
+                media_type, _ = mimetypes.guess_type(path_str)
 
         path_c = ffi.new("char[]", path_str.encode("utf-8"))
         media_type_c = ffi.new("char[]", media_type.encode("utf-8")) if media_type else ffi.NULL
@@ -133,6 +175,9 @@ class Validator:
 
         if not data:
             raise ValueError("Input bytes cannot be empty.")
+
+        if not media_type and len(data) >= 4:
+            media_type = sniff_media_type(data[:32])
 
         media_type_c = ffi.new("char[]", media_type.encode("utf-8")) if media_type else ffi.NULL
         status_ptr = ffi.new("int*")

@@ -26,6 +26,7 @@ import "C"
 import (
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"sync"
 	"time"
@@ -113,6 +114,54 @@ func (v *Validator) Close() error {
 	return nil
 }
 
+// SniffMediaType inspects leading magic bytes to identify container MIME types.
+func SniffMediaType(header []byte) string {
+	if len(header) >= 3 && header[0] == 0x49 && header[1] == 0x44 && header[2] == 0x33 { // "ID3"
+		return "audio/mpeg"
+	}
+	if len(header) >= 4 && string(header[:4]) == "fLaC" {
+		return "audio/flac"
+	}
+	if len(header) >= 3 && header[0] == 0xFF && header[1] == 0xD8 && header[2] == 0xFF {
+		return "image/jpeg"
+	}
+	if len(header) >= 8 && header[0] == 0x89 && header[1] == 0x50 && header[2] == 0x4E && header[3] == 0x47 &&
+		header[4] == 0x0D && header[5] == 0x0A && header[6] == 0x1A && header[7] == 0x0A {
+		return "image/png"
+	}
+	if len(header) >= 6 && (string(header[:6]) == "GIF87a" || string(header[:6]) == "GIF89a") {
+		return "image/gif"
+	}
+	if len(header) >= 4 && string(header[:4]) == "%PDF" {
+		return "application/pdf"
+	}
+	if len(header) >= 12 && string(header[:4]) == "RIFF" {
+		form := string(header[8:12])
+		switch form {
+		case "WAVE":
+			return "audio/wav"
+		case "WEBP":
+			return "image/webp"
+		case "AVI ":
+			return "video/x-msvideo"
+		}
+	}
+	if len(header) >= 12 && string(header[4:8]) == "ftyp" {
+		brand := string(header[8:12])
+		switch brand {
+		case "avif", "avis":
+			return "image/avif"
+		case "heic", "heix", "mif1":
+			return "image/heic"
+		case "M4A ":
+			return "audio/mp4"
+		default:
+			return "video/mp4"
+		}
+	}
+	return ""
+}
+
 // ValidateFile validates an asset file on disk and returns its ProvenanceReport.
 func (v *Validator) ValidateFile(filePath string, mediaType string) (*ProvenanceReport, error) {
 	v.mu.Lock()
@@ -125,6 +174,17 @@ func (v *Validator) ValidateFile(filePath string, mediaType string) (*Provenance
 	absPath, err := filepath.Abs(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("invalid file path: %w", err)
+	}
+
+	if mediaType == "" {
+		if f, err := os.Open(absPath); err == nil {
+			header := make([]byte, 32)
+			n, _ := f.Read(header)
+			_ = f.Close()
+			if n >= 4 {
+				mediaType = SniffMediaType(header[:n])
+			}
+		}
 	}
 
 	pathC := C.CString(absPath)
@@ -181,6 +241,14 @@ func (v *Validator) ValidateBytes(data []byte, mediaType string) (*ProvenanceRep
 	}
 	if len(data) == 0 {
 		return nil, errors.New("input data cannot be empty")
+	}
+
+	if mediaType == "" && len(data) >= 4 {
+		limit := 32
+		if len(data) < limit {
+			limit = len(data)
+		}
+		mediaType = SniffMediaType(data[:limit])
 	}
 
 	var mediaTypeC *C.char

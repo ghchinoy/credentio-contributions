@@ -58,6 +58,72 @@ char* DuplicateString(const std::string& str) {
   return copy;
 }
 
+std::optional<std::string> SniffMediaType(riegeli::Reader& reader) {
+  if (!reader.Seek(0) || reader.pos() != 0) {
+    return std::nullopt;
+  }
+  char buf[32];
+  size_t length_read = 0;
+  if (!reader.Read(32, buf, &length_read) || length_read < 4) {
+    reader.Seek(0);
+    return std::nullopt;
+  }
+  reader.Seek(0);
+
+  const uint8_t* b = reinterpret_cast<const uint8_t*>(buf);
+
+  // ID3 tag header (MP3 / MPEG audio container)
+  if (length_read >= 3 && b[0] == 0x49 && b[1] == 0x44 && b[2] == 0x33) {
+    return "audio/mpeg";
+  }
+
+  // FLAC header
+  if (length_read >= 4 && b[0] == 0x66 && b[1] == 0x4C && b[2] == 0x61 && b[3] == 0x43) {
+    return "audio/flac";
+  }
+
+  // JPEG header
+  if (length_read >= 3 && b[0] == 0xFF && b[1] == 0xD8 && b[2] == 0xFF) {
+    return "image/jpeg";
+  }
+
+  // PNG header
+  if (length_read >= 8 && b[0] == 0x89 && b[1] == 0x50 && b[2] == 0x4E && b[3] == 0x47 &&
+      b[4] == 0x0D && b[5] == 0x0A && b[6] == 0x1A && b[7] == 0x0A) {
+    return "image/png";
+  }
+
+  // GIF header
+  if (length_read >= 6 && b[0] == 0x47 && b[1] == 0x49 && b[2] == 0x46 && b[3] == 0x38 &&
+      (b[4] == 0x37 || b[4] == 0x39) && b[5] == 0x61) {
+    return "image/gif";
+  }
+
+  // PDF header
+  if (length_read >= 4 && b[0] == 0x25 && b[1] == 0x50 && b[2] == 0x44 && b[3] == 0x46) {
+    return "application/pdf";
+  }
+
+  // RIFF container
+  if (length_read >= 12 && b[0] == 0x52 && b[1] == 0x49 && b[2] == 0x46 && b[3] == 0x46) {
+    absl::string_view form(buf + 8, 4);
+    if (form == "WAVE") return "audio/wav";
+    if (form == "WEBP") return "image/webp";
+    if (form == "AVI ") return "video/x-msvideo";
+  }
+
+  // ISOBMFF / ftyp box
+  if (length_read >= 12 && b[4] == 0x66 && b[5] == 0x74 && b[6] == 0x79 && b[7] == 0x70) {
+    absl::string_view brand(buf + 8, 4);
+    if (brand == "avif" || brand == "avis") return "image/avif";
+    if (brand == "heic" || brand == "heix" || brand == "mif1") return "image/heic";
+    if (brand == "M4A ") return "audio/mp4";
+    return "video/mp4";
+  }
+
+  return std::nullopt;
+}
+
 absl::StatusOr<std::string> ValidateReaderAndGenerateCrJson(
     cr_validator* v,
     riegeli::Reader& reader,
@@ -181,9 +247,14 @@ char* cr_validate_file(
   if (media_type && strlen(media_type) > 0) {
     resolved_media_type = media_type;
   } else {
-    auto mt = credentio::MediaType(file_path);
-    if (mt.ok()) {
-      resolved_media_type = *mt;
+    auto sniffed = SniffMediaType(reader);
+    if (sniffed.has_value()) {
+      resolved_media_type = std::move(sniffed);
+    } else {
+      auto mt = credentio::MediaType(file_path);
+      if (mt.ok()) {
+        resolved_media_type = *mt;
+      }
     }
   }
 
@@ -225,9 +296,19 @@ char* cr_validate_bytes(
   absl::string_view bytes_view(reinterpret_cast<const char*>(bytes), count);
   riegeli::StringReader<> reader(bytes_view);
 
-  std::optional<absl::string_view> media_type_opt;
+  std::optional<std::string> resolved_media_type;
   if (media_type && strlen(media_type) > 0) {
-    media_type_opt = media_type;
+    resolved_media_type = media_type;
+  } else {
+    auto sniffed = SniffMediaType(reader);
+    if (sniffed.has_value()) {
+      resolved_media_type = std::move(sniffed);
+    }
+  }
+
+  std::optional<absl::string_view> media_type_opt;
+  if (resolved_media_type.has_value()) {
+    media_type_opt = *resolved_media_type;
   }
 
   auto json_result = ValidateReaderAndGenerateCrJson(validator, reader, media_type_opt);

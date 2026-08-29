@@ -384,3 +384,27 @@ func TestParseCrJSON_PortlandiaProbeMP4(t *testing.T) {
 		t.Errorf("expected 3 validation statuses, got %d", len(guard.ValidationStatuses))
 	}
 }
+
+func TestSniffMediaType(t *testing.T) {
+	tests := []struct {
+		header   []byte
+		expected string
+	}{
+		{[]byte("ID3\x03\x00\x00\x00\x00;jGEOB"), "audio/mpeg"},
+		{[]byte("fLaC\x00\x00\x00\""), "audio/flac"},
+		{[]byte("RIFF\x24\x08\x00\x00WAVEfmt "), "audio/wav"},
+		{[]byte("\xff\xd8\xff\xe0\x00\x10JFIF"), "image/jpeg"},
+		{[]byte("\x89PNG\r\n\x1a\n\x00\x00"), "image/png"},
+		{[]byte("%PDF-1.7"), "application/pdf"},
+		{[]byte("\x00\x00\x00\x1cftypavif\x00\x00\x00\x00"), "image/avif"},
+		{[]byte("\x00\x00\x00\x18ftypmp42\x00\x00\x00\x00"), "video/mp4"},
+	}
+
+	for _, tc := range tests {
+		got := SniffMediaType(tc.header)
+		if got != tc.expected {
+			t.Errorf("SniffMediaType(%q) = %q; want %q", tc.header, got, tc.expected)
+		}
+	}
+}
+
