@@ -90,7 +90,7 @@ build_static_archive() {
   # shellcheck disable=SC2086
   (
     cd "${CREDENTIO_DIR}"
-    bazel build ${extra_flags} //bindings_c:credentio_c
+    bazel build ${extra_flags} //bindings_c:libcredentio_c //bindings_c:credentio_c
   )
 
   local raw_list="${STAGE_DIR}/raw_archives_${label}.txt"
@@ -102,7 +102,7 @@ build_static_archive() {
   exec_root="$(cd "${CREDENTIO_DIR}" && bazel info execution_root 2>/dev/null || echo "")"
   bazel_bin="$(cd "${CREDENTIO_DIR}" && bazel info bazel-bin 2>/dev/null || echo "")"
 
-  local staged_expr='"\n".join([f.path for li in providers(target)["CcInfo"].linking_context.linker_inputs.to_list() for lib in li.libraries for f in [lib.static_library, lib.pic_static_library] if f])'
+  local staged_expr='"\n".join([f.path for k, v in providers(target).items() if "CcInfo" in str(k) for li in v.linking_context.linker_inputs.to_list() for lib in li.libraries for f in [lib.static_library, lib.pic_static_library] if f])'
   # shellcheck disable=SC2086
   local cquery_out
   cquery_out="$(cd "${CREDENTIO_DIR}" && bazel cquery ${extra_flags} //bindings_c:credentio_c --output=starlark --starlark:expr="${staged_expr}" 2>/dev/null || true)"

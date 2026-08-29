@@ -111,3 +111,75 @@ jobs:
                 labels: [issueLabel]
               });
             }
+
+  verify-builds:
+    name: Verify Builds & Native Bindings (macOS)
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Bazel
+        uses: bazel-contrib/setup-bazel@0.15.0
+        with:
+          bazelisk-cache: true
+          disk-cache: true
+
+      - name: Select Xcode 16
+        run: |
+          sudo xcode-select -s /Applications/Xcode_16.app/Contents/Developer 2>/dev/null || \
+          sudo xcode-select -s /Applications/Xcode_16.0.app/Contents/Developer 2>/dev/null || \
+          sudo xcode-select -s /Applications/Xcode_16.1.app/Contents/Developer 2>/dev/null || \
+          sudo xcode-select -s /Applications/Xcode_16.2.app/Contents/Developer 2>/dev/null || true
+          swift --version
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: Build Native Shared Library
+        run: |
+          ./scripts/build-shared-lib.sh
+
+      - name: Run Python Tests (Native C-ABI)
+        run: |
+          cd python
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+          pytest -v
+
+      - name: Run Go Tests (CGo Native)
+        run: |
+          cd go
+          CGO_ENABLED=1 go test -v ./...
+
+      - name: Build Swift XCFramework
+        env:
+          CREDENTIO_ZIP_RELEASE: "1"
+        run: |
+          ./scripts/build-swift-xcframework.sh --zip
+
+      - name: Validate Swift XCFramework Artifact Integrity
+        run: |
+          ZIP_FILE="swift/CredentioC.xcframework.zip"
+          STATIC_LIB="$(find swift/CredentioC.xcframework -name "libCredentioC.a" | head -n 1)"
+          ZIP_SIZE=$(stat -f%z "$ZIP_FILE" 2>/dev/null || stat -c%s "$ZIP_FILE")
+          echo "Zip Size: ${ZIP_SIZE} bytes"
+          if [ "$ZIP_SIZE" -lt 10000000 ]; then
+            echo "ERROR: Release zip is too small (${ZIP_SIZE} bytes < 10 MB)!"
+            exit 1
+          fi
+          nm -g "$STATIC_LIB" | grep -q "riegeli" || { echo "ERROR: Missing riegeli symbols!"; exit 1; }
+          nm -g "$STATIC_LIB" | grep -q "absl" || { echo "ERROR: Missing absl symbols!"; exit 1; }
+          nm -g "$STATIC_LIB" | grep -q "cr_validate" || { echo "ERROR: Missing cr_validate symbol!"; exit 1; }
+
+      - name: Run Swift Tests (Native In-Process)
+        run: |
+          cd swift
+          swift test -v
+

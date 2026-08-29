@@ -35,8 +35,14 @@ docs-site/.astro/
 swift/.build/
 swift/.swiftpm/
 swift/CredentioC.xcframework/
+swift/CredentioC.xcframework.zip
+swift/CredentioC.xcframework.zip.sha256
 *.xcodeproj
 Package.resolved
+
+# Copied distribution licenses & uv lock
+**/LICENSE.credentio
+python/uv.lock
 
 # macOS cruft
 .DS_Store

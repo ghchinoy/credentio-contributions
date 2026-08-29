@@ -62,6 +62,37 @@ jobs:
         run: |
           ./scripts/build-swift-xcframework.sh --zip
 
+      - name: Validate Swift XCFramework Artifact Integrity
+        run: |
+          echo "=== Validating CredentioC.xcframework Artifact Integrity ==="
+          ZIP_FILE="swift/CredentioC.xcframework.zip"
+          STATIC_LIB="$(find swift/CredentioC.xcframework -name "libCredentioC.a" | head -n 1)"
+
+          if [ ! -f "$ZIP_FILE" ]; then
+            echo "ERROR: $ZIP_FILE does not exist!"
+            exit 1
+          fi
+
+          ZIP_SIZE=$(stat -f%z "$ZIP_FILE" 2>/dev/null || stat -c%s "$ZIP_FILE")
+          echo "Zip Size: ${ZIP_SIZE} bytes"
+          if [ "$ZIP_SIZE" -lt 10000000 ]; then
+            echo "ERROR: Release zip is too small (${ZIP_SIZE} bytes < 10 MB), missing transitive dependencies!"
+            exit 1
+          fi
+
+          if [ -z "$STATIC_LIB" ] || [ ! -f "$STATIC_LIB" ]; then
+            echo "ERROR: libCredentioC.a not found in xcframework!"
+            exit 1
+          fi
+
+          echo "Verifying symbols in static library ($STATIC_LIB)..."
+          nm -g "$STATIC_LIB" | grep -q "riegeli" || { echo "ERROR: Missing riegeli symbols in static library!"; exit 1; }
+          nm -g "$STATIC_LIB" | grep -q "absl" || { echo "ERROR: Missing absl symbols in static library!"; exit 1; }
+          nm -g "$STATIC_LIB" | grep -q "cr_validate" || { echo "ERROR: Missing cr_validate symbol!"; exit 1; }
+
+          echo "Running Swift test suite against built XCFramework..."
+          (cd swift && swift test)
+
       - name: Upload Swift Artifacts
         uses: actions/upload-artifact@v4
         with:

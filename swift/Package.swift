@@ -29,8 +29,8 @@ let nativeXcframeworkURL = customXCFPath.map { URL(fileURLWithPath: ($0 as NSStr
     ?? packageDir.appendingPathComponent("CredentioC.xcframework")
 
 // Prebuilt binary distribution release metadata
-let releaseVersion = "0.1.3"
-let remoteChecksum = "a9c6fd4071e5a3d76bb3656160ffd2241b780fef5829d5d88eb9f4c4a2c479fb"
+let releaseVersion = "0.1.4"
+let remoteChecksum = "a6a9c335df3122a0457c632907e3f23b2ca49f0b1824fb0412c1826d936920a6"
 let remoteURL = "https://github.com/ghchinoy/credentio-contributions/releases/download/v\(releaseVersion)/CredentioC.xcframework.zip"
 
 if FileManager.default.fileExists(atPath: nativeXcframeworkURL.path) {

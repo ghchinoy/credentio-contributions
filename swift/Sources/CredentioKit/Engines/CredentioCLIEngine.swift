@@ -14,15 +14,15 @@
 
 import Foundation
 
-/// `ProvenanceEngine` backed by the Google Credentio `c2pa_validate` CLI tool.
+/// `ProvenanceEngine` backed by the Google Credentio `c2pa_validate` or `c2patool` CLI tool.
 ///
 /// Executes the CLI binary as an asynchronous subprocess, captures the `crjson`
 /// output, measures execution time, and maps the result into `ProvenanceReport`.
 public struct CredentioCLIEngine: ProvenanceEngine {
     public let id = "credentio"
-    public let displayName = "Credentio CLI (Google)"
+    public let displayName = "Credentio CLI / c2patool"
 
-    /// Explicit path to the `c2pa_validate` binary, or `nil` to look in standard paths.
+    /// Explicit path to the CLI binary, or `nil` to look in standard paths.
     public var executablePath: String?
     /// Optional path to claim signer trust anchors PEM.
     public var claimSignerTrustPath: String?
@@ -39,8 +39,7 @@ public struct CredentioCLIEngine: ProvenanceEngine {
         self.tsaTrustPath = tsaTrustPath
     }
 
-    /// Locates the `c2pa_validate` executable by checking explicit path, app bundle,
-    /// and standard Unix search paths.
+    /// Locates the `c2pa_validate`, `c2patool`, or `credentio` executable.
     public static func resolveExecutableURL(customPath: String? = nil) -> URL? {
         if let customPath, !customPath.isEmpty {
             let url = URL(fileURLWithPath: (customPath as NSString).expandingTildeInPath)
@@ -49,38 +48,40 @@ public struct CredentioCLIEngine: ProvenanceEngine {
             }
         }
 
-        // Check inside application bundle Resources or MacOS
-        if let bundleURL = Bundle.main.url(forResource: "c2pa_validate", withExtension: nil) {
-            return bundleURL
-        }
-        if let auxURL = Bundle.main.executableURL?.deletingLastPathComponent().appendingPathComponent("c2pa_validate"),
-           FileManager.default.isExecutableFile(atPath: auxURL.path) {
-            return auxURL
-        }
-
-        // Check system $PATH environment variable
-        if let envPath = ProcessInfo.processInfo.environment["PATH"] {
-            for dir in envPath.split(separator: ":") {
-                let candidate = URL(fileURLWithPath: String(dir)).appendingPathComponent("c2pa_validate")
-                if FileManager.default.isExecutableFile(atPath: candidate.path) {
-                    return candidate
-                }
-            }
-        }
-
-        // Check common host and development locations
-        let candidatePaths = [
-            "/opt/homebrew/bin/c2pa_validate",
-            "/usr/local/bin/c2pa_validate",
-            (NSHomeDirectory() as NSString).appendingPathComponent(".local/bin/c2pa_validate"),
-            (NSHomeDirectory() as NSString).appendingPathComponent("bin/c2pa_validate"),
-            (NSHomeDirectory() as NSString).appendingPathComponent("projects/credentio/bazel-bin/tools/c2pa_validate"),
-            "/workspace/credentio/bazel-bin/tools/c2pa_validate"
+        let binaryNames = ["c2pa_validate", "c2patool", "credentio"]
+        let candidateDirs = [
+            "/opt/homebrew/bin",
+            "/usr/local/bin",
+            (NSHomeDirectory() as NSString).appendingPathComponent(".cargo/bin"),
+            (NSHomeDirectory() as NSString).appendingPathComponent(".local/bin"),
+            (NSHomeDirectory() as NSString).appendingPathComponent("bin"),
+            (NSHomeDirectory() as NSString).appendingPathComponent("projects/credentio/bazel-bin/tools"),
+            "/workspace/credentio/bazel-bin/tools"
         ]
 
-        for path in candidatePaths {
-            if FileManager.default.isExecutableFile(atPath: path) {
-                return URL(fileURLWithPath: path)
+        // Check system $PATH environment variable
+        var envDirs: [String] = []
+        if let envPath = ProcessInfo.processInfo.environment["PATH"] {
+            envDirs = envPath.split(separator: ":").map(String.init)
+        }
+
+        let allDirs = envDirs + candidateDirs
+
+        for binary in binaryNames {
+            // Check inside application bundle Resources or MacOS
+            if let bundleURL = Bundle.main.url(forResource: binary, withExtension: nil) {
+                return bundleURL
+            }
+            if let auxURL = Bundle.main.executableURL?.deletingLastPathComponent().appendingPathComponent(binary),
+               FileManager.default.isExecutableFile(atPath: auxURL.path) {
+                return auxURL
+            }
+
+            for dir in allDirs {
+                let fullPath = (dir as NSString).appendingPathComponent(binary)
+                if FileManager.default.isExecutableFile(atPath: fullPath) {
+                    return URL(fileURLWithPath: fullPath)
+                }
             }
         }
 
@@ -95,19 +96,29 @@ public struct CredentioCLIEngine: ProvenanceEngine {
 
         guard let executableURL = Self.resolveExecutableURL(customPath: executablePath) else {
             throw ProvenanceError.engineFailure(
-                "Credentio CLI (c2pa_validate) not found. Build it with 'bazel build tools:c2pa_validate' or specify path."
+                "No C2PA CLI tool found (checked c2pa_validate, c2patool, credentio). Please ensure c2patool or c2pa_validate is in PATH."
             )
         }
 
-        var arguments = [
-            "--asset=\(url.path)",
-            "--output_format=crjson"
-        ]
-        if let claimSignerTrustPath, !claimSignerTrustPath.isEmpty {
-            arguments.append("--claim_signer_trust=\(claimSignerTrustPath)")
-        }
-        if let tsaTrustPath, !tsaTrustPath.isEmpty {
-            arguments.append("--tsa_trust=\(tsaTrustPath)")
+        let isC2PATool = executableURL.lastPathComponent == "c2patool"
+        let isCredentio = executableURL.lastPathComponent == "credentio"
+        var arguments: [String] = []
+
+        if isC2PATool {
+            arguments = [url.path]
+        } else if isCredentio {
+            arguments = ["validate", url.path, "-json", "-skip-trust-checks"]
+        } else {
+            arguments = [
+                "--asset=\(url.path)",
+                "--output_format=crjson"
+            ]
+            if let claimSignerTrustPath, !claimSignerTrustPath.isEmpty {
+                arguments.append("--claim_signer_trust=\(claimSignerTrustPath)")
+            }
+            if let tsaTrustPath, !tsaTrustPath.isEmpty {
+                arguments.append("--tsa_trust=\(tsaTrustPath)")
+            }
         }
 
         let clock = ContinuousClock()
@@ -125,7 +136,7 @@ public struct CredentioCLIEngine: ProvenanceEngine {
         do {
             try process.run()
         } catch {
-            throw ProvenanceError.engineFailure("Failed to spawn c2pa_validate: \(error.localizedDescription)")
+            throw ProvenanceError.engineFailure("Failed to spawn \(executableURL.lastPathComponent): \(error.localizedDescription)")
         }
 
         let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
@@ -136,11 +147,21 @@ public struct CredentioCLIEngine: ProvenanceEngine {
         let stdout = String(data: stdoutData, encoding: .utf8) ?? ""
         let stderr = String(data: stderrData, encoding: .utf8) ?? ""
 
-        // Credentio CLI outputs:
-        // "Validation successful!\nValidation Result (crjson):\n{...}"
-        // Or "Validation failed: ..."
+        if stdout.contains("{") {
+            let jsonPayload = Self.extractJSON(from: stdout)
+            return CredentioCrjsonMapper.mapReport(
+                json: jsonPayload,
+                mediaType: format,
+                elapsed: elapsed,
+                engineInternalElapsed: nil,
+                engineID: id,
+                engineName: isC2PATool ? "c2patool (CLI)" : displayName
+            )
+        }
+
         if process.terminationStatus != 0 || stdout.isEmpty {
-            if stderr.contains("No C2PA") || stderr.contains("not found") || stdout.contains("No C2PA") || process.terminationStatus != 0 {
+            if stderr.contains("No C2PA") || stderr.contains("not found") || stderr.contains("No claim found")
+                || stdout.contains("No C2PA") || stdout.contains("No claim found") {
                 return .empty(
                     engineID: id,
                     engineName: displayName,
@@ -148,8 +169,11 @@ public struct CredentioCLIEngine: ProvenanceEngine {
                     mediaType: format
                 )
             }
-            throw ProvenanceError.engineFailure(
-                stderr.isEmpty ? "c2pa_validate failed with code \(process.terminationStatus)" : stderr
+            return .empty(
+                engineID: id,
+                engineName: displayName,
+                elapsed: elapsed,
+                mediaType: format
             )
         }
 
@@ -160,7 +184,7 @@ public struct CredentioCLIEngine: ProvenanceEngine {
             elapsed: elapsed,
             engineInternalElapsed: nil,
             engineID: id,
-            engineName: displayName
+            engineName: isC2PATool ? "c2patool (CLI)" : displayName
         )
     }
 
