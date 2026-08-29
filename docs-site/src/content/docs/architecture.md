@@ -69,7 +69,23 @@ This isolates the raw C++ cryptographic validation time from file I/O, Python/Go
 
 ---
 
-## 4. Monolithic Shared Library Compilation
+## 4. Container Sniffing & Format Resolution
+
+Google Credentio relies on format extractors (such as `Id3Extractor` for MPEG audio, `RiffExtractor` for WAV/WebP, and `IsobmffExtractor` for MP4/ISOBMFF). When an asset is named with a mismatched extension (for example, an MP3 stream saved with a `.wav` extension), relying only on file extension causes extractor dispatch to fail.
+
+To ensure resilience, the C-ABI layer and language bindings inspect the leading 32 header bytes before falling back to filename extension:
+- `49 44 33` (`ID3`) $\to$ `audio/mpeg`
+- `66 4C 61 43` (`fLaC`) $\to$ `audio/flac`
+- `52 49 46 46 .... 57 41 56 45` (`RIFF...WAVE`) $\to$ `audio/wav`
+- `52 49 46 46 .... 57 45 42 50` (`RIFF...WEBP`) $\to$ `image/webp`
+- `FF D8 FF` $\to$ `image/jpeg`
+- `89 50 4E 47` $\to$ `image/png`
+- `25 50 44 46` $\to$ `application/pdf`
+- `.... 66 74 79 70` (`ftyp`) $\to$ `video/mp4`, `audio/mp4`, `image/heic`, `image/avif`
+
+---
+
+## 5. Monolithic Shared Library Compilation
 
 The Bazel build target:
 

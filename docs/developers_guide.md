@@ -62,11 +62,22 @@ To insulate Python, Go, and Swift from C++20 standard library templates, Protoco
 ### Functions Exported:
 - `cr_validator_create(claim_pem, tsa_pem, skip_trust)`: Initializes an `AssetValidatorImpl` instance with `DefaultCryptoReadHandler`.
 - `cr_validator_free(v)`: Releases native validator resources.
-- `cr_validate_file(v, path, media_type, out_status)`: Validates a file on disk using `riegeli::CFileReader` and formats results as crJSON.
-- `cr_validate_bytes(v, bytes, count, media_type, out_status)`: Validates in-memory data using `riegeli::StringReader` and formats results as crJSON.
+- `cr_validate_file(v, path, media_type, out_status)`: Validates a file on disk using `riegeli::CFileReader` and formats results as crJSON. If `media_type` is NULL or empty, leading bytes are sniffed automatically before falling back to filename extension.
+- `cr_validate_bytes(v, bytes, count, media_type, out_status)`: Validates in-memory data using `riegeli::StringReader` and formats results as crJSON with automatic byte-header sniffing.
 - `cr_last_error(v)`: Returns the most recent error message string.
 - `cr_last_internal_seconds(v)`: Returns sub-millisecond core engine validation duration (measured using `std::chrono::high_resolution_clock`).
 - `cr_string_free(str)`: Frees malloc'd crJSON strings.
+
+### Container Sniffing & MIME Resolution:
+To prevent validation failures caused by misnamed files (such as MPEG/ID3 audio streams saved with `.wav` extensions), the C-ABI and all language bindings inspect the leading 32 header bytes before falling back to filename extension:
+- `49 44 33` (`ID3`) $\to$ `audio/mpeg` (dispatched to `Id3Extractor` for C2PA GEOB frames)
+- `66 4C 61 43` (`fLaC`) $\to$ `audio/flac`
+- `52 49 46 46 .... 57 41 56 45` (`RIFF...WAVE`) $\to$ `audio/wav` (dispatched to `RiffExtractor`)
+- `52 49 46 46 .... 57 45 42 50` (`RIFF...WEBP`) $\to$ `image/webp`
+- `FF D8 FF` $\to$ `image/jpeg`
+- `89 50 4E 47` $\to$ `image/png`
+- `25 50 44 46` $\to$ `application/pdf`
+- `.... 66 74 79 70` (`ftyp`) $\to$ `video/mp4`, `audio/mp4`, `image/heic`, `image/avif` (dispatched to `IsobmffExtractor`)
 
 ---
 
