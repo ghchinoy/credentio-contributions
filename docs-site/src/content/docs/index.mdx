@@ -1,16 +1,16 @@
 ---
 title: Credentio Contributions
-description: High-performance Python, Go, and Swift bindings for Google Credentio C2PA Content Credentials.
+description: High-performance Python, Go, Swift, and WebAssembly bindings for Google Credentio C2PA Content Credentials.
 template: splash
 hero:
-  tagline: Validate C2PA Content Credentials in Python, Go, and Swift. In-process, local-first, zero network overhead.
+  tagline: Validate C2PA Content Credentials in Python, Go, Swift, and TypeScript. In-process, local-first, zero network overhead.
   actions:
     - text: Quick Start
       link: /credentio-contributions/getting-started/
       icon: right-arrow
       variant: primary
-    - text: CLI Tutorial
-      link: /credentio-contributions/cli/
+    - text: Interactive Demo
+      link: /credentio-contributions/wasm/
       icon: rocket
       variant: secondary
     - text: Why Bindings?
@@ -26,6 +26,16 @@ import { Card, CardGrid, LinkCard, Tabs, TabItem } from '@astrojs/starlight/comp
 Verify C2PA Content Credentials directly in your application without network round-trips or subprocess startup latency:
 
 <Tabs>
+  <TabItem label="TypeScript (WASM)" icon="seti:typescript">
+    ```typescript
+    import { CredentioValidator } from '@ghchinoy/credentio-wasm';
+
+    using validator = await CredentioValidator.create();
+    const report = await validator.validateBlob(fileBlob);
+    console.log(`Status: ${report.badge.toUpperCase()}`); // 'SIGNED', 'UNSIGNED', 'INVALID'
+    ```
+  </TabItem>
+
   <TabItem label="Python" icon="seti:python">
     ```python
     from credentio import Validator
@@ -60,6 +70,11 @@ Verify C2PA Content Credentials directly in your application without network rou
 ## Choose Your Language
 
 <CardGrid>
+  <LinkCard
+    title="WebAssembly (TypeScript)"
+    description="Isomorphic WASM package for browsers, workers, Node.js, and edge runtimes."
+    href="/credentio-contributions/wasm/"
+  />
   <LinkCard
     title="Python (credentio)"
     description="Modern cffi binding with typed dataclasses, context managers, and sub-millisecond execution."
@@ -102,22 +117,23 @@ Powered natively by [Google Credentio](https://mediaprovenance.googlesource.com/
 
 ## Unified Architecture
 
-Each language binding shares the same underlying `extern "C"` binary bridge (`libcredentio_c`), ensuring consistent validation semantics and uniform output across all platforms:
+Each language binding shares the same underlying `extern "C"` binary bridge (`libcredentio_c` / `credentio.wasm`), ensuring consistent validation semantics and uniform output across all platforms:
 
 ```text
-┌───────────────────────────┐  ┌───────────────────────────┐  ┌───────────────────────────┐
-│     Python (credentio)    │  │     Go (credentio/go)     │  │    Swift (CredentioKit)   │
-│  - cffi dynamic binding   │  │  - cgo native binding     │  │  - Actor-isolated Swift   │
-│  - Typed dataclasses      │  │  - Idiomatic Go structs   │  │  - Static XCFramework     │
-└─────────────┬─────────────┘  └─────────────┬─────────────┘  └─────────────┬─────────────┘
-              │                              │                              │
-              └──────────────────────────────┼──────────────────────────────┘
-                                             │
-                           ┌─────────────────▼─────────────────┐
-                           │      libcredentio_c (C-ABI)       │
-                           └─────────────────┬─────────────────┘
-                                             │
-                           ┌─────────────────▼─────────────────┐
-                           │      Google Credentio (C++20)     │
-                           └───────────────────────────────────┘
+┌─────────────────────────┐ ┌─────────────────────────┐ ┌─────────────────────────┐ ┌─────────────────────────┐
+│     TypeScript (WASM)   │ │     Python (credentio)  │ │     Go (credentio/go)   │ │    Swift (CredentioKit) │
+│  - Isomorphic Emscripten│ │  - cffi dynamic binding │ │  - cgo native binding   │ │  - Actor-isolated Swift │
+│  - Browser & Node.js    │ │  - Typed dataclasses    │ │  - Idiomatic Go structs │ │  - Static XCFramework   │
+└────────────┬────────────┘ └────────────┬────────────┘ └────────────┬────────────┘ └────────────┬────────────┘
+             │                           │                           │                           │
+             └───────────────────────────┴─────────────┬─────────────┴───────────────────────────┘
+                                                       │
+                                     ┌─────────────────▼─────────────────┐
+                                     │      Shared C-ABI Bridge Layer    │
+                                     │   (libcredentio_c / credentio.wasm)
+                                     └─────────────────┬─────────────────┘
+                                                       │
+                                     ┌─────────────────▼─────────────────┐
+                                     │      Google Credentio (C++20)     │
+                                     └───────────────────────────────────┘
 ```

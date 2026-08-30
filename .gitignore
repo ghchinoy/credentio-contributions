@@ -30,6 +30,12 @@ go/bin/
 docs-site/node_modules/
 docs-site/dist/
 docs-site/.astro/
+docs-site/public/wasm/
+
+# WebAssembly & TypeScript package artifacts
+wasm/node_modules/
+wasm/dist/
+wasm/lib/
 
 # Swift artifacts
 swift/.build/
@@ -46,3 +52,8 @@ python/uv.lock
 
 # macOS cruft
 .DS_Store
+
+# Scratch and local planning
+.agents/
+.serena/
+PROJECT.md

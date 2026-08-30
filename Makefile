@@ -1,4 +1,4 @@
-.PHONY: help build-lib build-swift fetch-lib check-drift python-install python-test go-test swift-test test docs-install docs-serve docs-build clean
+.PHONY: help build-lib build-swift build-wasm fetch-lib check-drift python-install python-test go-test swift-test wasm-install wasm-build wasm-test test docs-install docs-serve docs-build clean
 
 help: ## Show this help message
 	@echo "Usage: make [target]"
@@ -13,6 +13,10 @@ build-lib: ## Build native libcredentio_c shared library (for Python & Go)
 build-swift: ## Build native CredentioC.xcframework static library (for Swift)
 	@echo "Building CredentioC static xcframework for Swift..."
 	./scripts/build-swift-xcframework.sh
+
+build-wasm: ## Build native WebAssembly binary (credentio.wasm & credentio.js)
+	@echo "Building WebAssembly binary via Emscripten..."
+	./scripts/build-wasm.sh
 
 fetch-lib: ## Download prebuilt native library from GitHub Releases for Go & Python
 	@echo "Downloading prebuilt libcredentio_c binary..."
@@ -38,7 +42,19 @@ swift-test: ## Run Swift unit tests (swift test)
 	@echo "Running Swift tests..."
 	cd swift && swift test
 
-test: python-test go-test ## Run all test suites
+wasm-install: ## Install TypeScript WASM package dependencies (npm)
+	@echo "Installing WASM package dependencies..."
+	cd wasm && npm install
+
+wasm-build: wasm-install ## Compile TypeScript WASM package (tsc / build)
+	@echo "Building TypeScript WASM package..."
+	cd wasm && npm run build
+
+wasm-test: wasm-build ## Run TypeScript WASM test suite (npm test)
+	@echo "Running TypeScript WASM tests..."
+	cd wasm && npm test
+
+test: python-test go-test wasm-test ## Run Python, Go, and WASM test suites
 
 docs-install: ## Install documentation site dependencies (npm)
 	@echo "Installing documentation dependencies..."
@@ -54,6 +70,6 @@ docs-build: docs-install ## Build static documentation site (Astro Starlight)
 
 clean: ## Clean build artifacts
 	@echo "Cleaning artifacts..."
-	rm -rf native/libcredentio_c.* python/src/credentio/lib python/dist python/build python/*.egg-info go/lib docs-site/dist docs-site/.astro swift/.build swift/CredentioC.xcframework
+	rm -rf native/libcredentio_c.* python/src/credentio/lib python/dist python/build python/*.egg-info go/lib docs-site/dist docs-site/.astro swift/.build swift/CredentioC.xcframework wasm/dist wasm/lib wasm/node_modules wasm/.turbo docs-site/public/wasm
 	find . -type d -name "__pycache__" -exec rm -rf {} +
 	@echo "Clean complete."

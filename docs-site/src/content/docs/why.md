@@ -30,27 +30,28 @@ Credentio was engineered specifically to solve this problem:
 
 ---
 
-## Why Build Python, Go, and Swift Bindings?
+## Why Build Python, Go, Swift, and WebAssembly Bindings?
 
-While Credentio's core is written in C++20, modern media processing pipelines, backend microservices, AI workflows, and native client applications are largely written in **Python**, **Go**, and **Swift**:
+While Credentio's core is written in C++20, modern media processing pipelines, backend microservices, AI workflows, native client apps, and web applications are written in **Python**, **Go**, **Swift**, and **TypeScript**:
 
 | Workflow | Language | Need |
 | :--- | :--- | :--- |
+| **In-Browser & Edge Verification** | TypeScript / WASM | Zero-network-egress client verification in browsers, web workers, and edge functions. |
 | **AI Data Pipelines & ML Inference** | Python | Fast verification of training datasets and generated assets using NumPy/PyTorch. |
 | **Cloud Microservices & APIs** | Go | Low-latency HTTP/gRPC middleware inspecting incoming media uploads. |
 | **Native Apple Applications** | Swift | On-device C2PA verification in macOS and iOS applications with Swift 6 strict concurrency safety. |
 | **Batch Media Ingestion** | Python / Go | High-throughput concurrent validation across object storage buckets. |
 
-Without native bindings, developers were forced to either spawn command-line subprocesses (which incur a 50–100 ms startup overhead per file) or write complex custom C++ glue code.
+Without native bindings, developers were forced to either spawn command-line subprocesses (which incur a 50 to 100 ms startup overhead per file) or write complex custom C++ glue code.
 
 ### The Solution: A Unified C-ABI
 
-**Credentio Contributions** provides a single `extern "C"` ABI bridge (`libcredentio_c` / `CredentioC.xcframework`) that compiles the entire C++ library into a monolithic binary artifact. 
+**Credentio Contributions** provides a single `extern "C"` ABI bridge (`libcredentio_c` / `CredentioC.xcframework` / `credentio.wasm`) that compiles the entire C++ library into monolithic binary artifacts. 
 
 This enables:
 - **In-process execution**: Core verification runs in **3 to 5 milliseconds** per asset instead of 100 ms over CLI subprocesses.
-- **Idiomatic APIs**: Python developers use typed dataclasses and context managers (`Validator`), Go developers use standard structs and method receivers (`credentio.NewValidator`), and Swift developers use actor-isolated engines (`CredentioNativeEngine`).
-- **Single maintenance surface**: All three bindings share the exact same underlying C-ABI and validation logic.
+- **Idiomatic APIs**: Python developers use typed dataclasses and context managers (`Validator`), Go developers use standard structs and method receivers (`credentio.NewValidator`), Swift developers use actor-isolated engines (`CredentioNativeEngine`), and TypeScript developers use async classes and WebAssembly bridges (`CredentioValidator`).
+- **Single maintenance surface**: All four bindings share the exact same underlying C-ABI and validation logic.
 
 ---
 
@@ -60,4 +61,4 @@ As noted in Google's original announcement:
 
 > *"We welcome contributions from the developer community! Whether you are interested in submitting bug fixes, adding new features, or optimizing performance, we invite developers, security researchers, and media ecosystem partners to collaborate with us and help shape the future of local C2PA validation."*
 
-This repository is designed to support the broader ecosystem by expanding Credentio's reach into Python, Go, and Swift.
+This repository is designed to support the broader ecosystem by expanding Credentio's reach into Python, Go, Swift, and WebAssembly.

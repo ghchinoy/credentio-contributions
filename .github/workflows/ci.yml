@@ -72,3 +72,53 @@ jobs:
         run: |
           cd swift
           swift test -v
+
+  wasm:
+    name: WebAssembly & TypeScript (Node 20)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check Changed Paths
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            wasm:
+              - 'wasm/**'
+              - 'native/**'
+              - 'scripts/build-wasm.sh'
+              - 'scripts/wasm/**'
+              - '.credentio-pin'
+              - '.github/workflows/ci.yml'
+
+      - name: Set up Node.js
+        if: steps.filter.outputs.wasm == 'true' || github.event_name == 'push'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: wasm/package-lock.json
+
+      - name: Build WebAssembly Engine
+        if: steps.filter.outputs.wasm == 'true' || github.event_name == 'push'
+        run: |
+          ./scripts/build-wasm.sh
+
+      - name: Install Dependencies
+        if: steps.filter.outputs.wasm == 'true' || github.event_name == 'push'
+        run: |
+          cd wasm
+          npm ci
+
+      - name: Typecheck TypeScript SDK
+        if: steps.filter.outputs.wasm == 'true' || github.event_name == 'push'
+        run: |
+          cd wasm
+          npm run typecheck
+
+      - name: Run Vitest Suite (Unit & WASM Native Integration)
+        if: steps.filter.outputs.wasm == 'true' || github.event_name == 'push'
+        run: |
+          cd wasm
+          npm test

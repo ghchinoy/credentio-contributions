@@ -105,3 +105,21 @@ By specifying `linkshared = True` and setting `alwayslink = True` on `credentio_
 - **nlohmann_json:** JSON construction and dumping
 
 The resulting `libcredentio_c.dylib` (macOS) or `libcredentio_c.so` (Linux) is completely self-contained and requires no external C++ runtime dependencies beyond `libc++`.
+
+---
+
+## 6. WebAssembly & Emscripten Compilation
+
+For web browsers, web workers, Node.js, and edge runtimes, `scripts/build-wasm.sh` compiles `native/credentio_c.cc` into WebAssembly using Emscripten (`em++`):
+
+```bash
+em++ -O3 -std=c++20 \
+  -sMODULARIZE=1 -sEXPORT_ES6=1 \
+  -sALLOW_MEMORY_GROWTH=1 \
+  -sEXPORTED_FUNCTIONS="['_cr_validator_create','_cr_validator_free','_cr_validate_bytes','_cr_validate_file','_cr_last_error','_cr_last_internal_seconds','_cr_string_free','_cr_version','_malloc','_free']" \
+  -sEXPORTED_RUNTIME_METHODS="['stringToUTF8','UTF8ToString','lengthBytesUTF8','HEAPU8']" \
+  ...
+```
+
+The resulting `credentio.wasm` and `credentio.js` bundle all C2PA extractors, parsers, cryptographic validators, and memory management into an isomorphic ES module that executes across browser and server environments.
+

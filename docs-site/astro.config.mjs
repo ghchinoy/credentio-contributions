@@ -51,6 +51,7 @@ export default defineConfig({
 						{ label: 'Python (credentio)', slug: 'python' },
 						{ label: 'Go (credentio/go)', slug: 'go' },
 						{ label: 'Swift (CredentioKit)', slug: 'swift' },
+						{ label: 'WebAssembly (TypeScript)', slug: 'wasm' },
 					],
 				},
 				{

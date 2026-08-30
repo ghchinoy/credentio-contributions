@@ -1,0 +1,398 @@
+---
+title: WebAssembly & TypeScript SDK Reference (@ghchinoy/credentio-wasm)
+description: Isomorphic C2PA Content Credentials validation in Web Browsers, Web Workers, Node.js, and Edge runtimes.
+---
+
+import { Card, CardGrid, Tabs, TabItem } from '@astrojs/starlight/components';
+
+The `@ghchinoy/credentio-wasm` package brings Google Credentio's high-performance C++20 C2PA Content Credentials validation engine directly to the TypeScript and JavaScript ecosystem.
+
+> **Disclaimer:** This project is an open-source community contribution and is not an officially supported Google product. Authoritative C++ source and specifications live in [Google Credentio](https://mediaprovenance.googlesource.com/credentio).
+
+---
+
+## Interactive Validation Demo
+
+An interactive in-browser C2PA drag-and-drop validation widget powered by `@ghchinoy/credentio-wasm` is coming soon once the WebAssembly engine build pipeline is finalized.
+
+---
+
+## 1. Installation
+
+Install `@ghchinoy/credentio-wasm` using your preferred package manager (or install directly from GitHub release tarball):
+
+<Tabs>
+  <TabItem label="npm" icon="seti:npm">
+    ```bash
+    npm install @ghchinoy/credentio-wasm
+    ```
+  </TabItem>
+  <TabItem label="Release Tarball" icon="seti:zip">
+    ```bash
+    npm install https://github.com/ghchinoy/credentio-contributions/releases/download/v0.1.5/ghchinoy-credentio-wasm-0.1.5.tgz
+    ```
+  </TabItem>
+  <TabItem label="pnpm" icon="pnpm">
+    ```bash
+    pnpm add @ghchinoy/credentio-wasm
+    ```
+  </TabItem>
+  <TabItem label="yarn" icon="seti:yarn">
+    ```bash
+    yarn add @ghchinoy/credentio-wasm
+    ```
+  </TabItem>
+  <TabItem label="Bun" icon="seti:javascript">
+    ```bash
+    bun add @ghchinoy/credentio-wasm
+    ```
+  </TabItem>
+</Tabs>
+
+---
+
+## 2. Architecture
+
+The SDK is organized into two distinct layers to accommodate both high-level developer ergonomics and low-level performance tuning:
+
+```text
+┌────────────────────────────────────────────────────────┐
+│                   High-Level API                       │
+│  - CredentioValidator (Context-managed / Async)        │
+│  - validateBytes(buffer: Uint8Array | ArrayBuffer)     │
+│  - validateBlob(blob: Blob)                            │
+│  - Strong Data Models (ProvenanceReport, Manifest)     │
+└───────────────────────────┬────────────────────────────┘
+                            │
+┌───────────────────────────▼────────────────────────────┐
+│                    Low-Level Bridge                    │
+│  - CredentioWasmBridge / Universal Module Loader       │
+│  - Memory allocation (_malloc, HEAPU8.set, _free)      │
+│  - UTF-8 string conversion (stringToUTF8, UTF8ToString)│
+│  - Raw crJSON string parsing & schema normalization    │
+└───────────────────────────┬────────────────────────────┘
+                            │
+┌───────────────────────────▼────────────────────────────┐
+│                 Emscripten WASM Engine                 │
+│  - credentio.wasm (C++20 Google Credentio runtime)     │
+│  - credentio.js (ES6 module glue & factory)            │
+└────────────────────────────────────────────────────────┘
+```
+
+<CardGrid>
+  <Card title="High-Level API (CredentioValidator)" icon="rocket">
+    Asynchronous, object-oriented API that accepts `Uint8Array`, `ArrayBuffer`, or standard `Blob`/`File` inputs and outputs strongly-typed `ProvenanceReport` structures.
+  </Card>
+  <Card title="Low-Level Bridge (CredentioWasmBridge)" icon="laptop">
+    Direct access to WebAssembly linear memory (`_malloc`, `_free`, `HEAPU8`), pointer management, and raw C-ABI export functions.
+  </Card>
+</CardGrid>
+
+---
+
+## 3. Usage Guide
+
+### Browser Usage (File Input / Drag and Drop)
+
+```typescript
+import { CredentioValidator } from '@ghchinoy/credentio-wasm';
+
+async function inspectFile(file: File) {
+  // 1. Initialize validator instance
+  const validator = await CredentioValidator.create({
+    skipTrustChecks: true, // Bypass trust anchor checks for local testing
+  });
+
+  try {
+    // 2. Validate the file Blob directly
+    const report = await validator.validateBlob(file);
+
+    if (!report.hasCredentials) {
+      console.log('No C2PA Content Credentials found in this asset.');
+      return;
+    }
+
+    // 3. Inspect validation badge state
+    console.log(`Badge status: ${report.badge}`); // 'signed' | 'unsigned' | 'invalid'
+    console.log(`Verified:     ${report.isVerified}`);
+    console.log(`Generator:    ${report.primaryClaimGenerator}`);
+    console.log(`Signer:       ${report.primarySignerIssuer}`);
+
+    // 4. Iterate over active manifest assertions
+    if (report.activeManifest) {
+      for (const assertion of report.activeManifest.assertions) {
+        console.log(`Assertion [${assertion.kind}]: ${assertion.label}`);
+        if (assertion.summary) {
+          console.log(`  Summary: ${assertion.summary}`);
+        }
+      }
+    }
+  } finally {
+    // 5. Always free native WebAssembly memory
+    validator.close();
+  }
+}
+```
+
+---
+
+### Web Worker Usage (Offloading from UI Thread)
+
+For smooth 60 FPS user interfaces when processing large videos or multiple images in batch, run validation inside a dedicated Web Worker:
+
+```typescript
+// worker.ts
+import { CredentioValidator } from '@ghchinoy/credentio-wasm';
+
+let validator: CredentioValidator | null = null;
+
+self.onmessage = async (event: MessageEvent<{ file: File; id: string }>) => {
+  const { file, id } = event.data;
+
+  if (!validator) {
+    validator = await CredentioValidator.create();
+  }
+
+  try {
+    const report = await validator.validateBlob(file);
+    self.postMessage({ id, success: true, report });
+  } catch (err: any) {
+    self.postMessage({ id, success: false, error: err.message });
+  }
+};
+```
+
+---
+
+### Node.js (v18+) with Explicit Resource Management (`using`)
+
+Under TypeScript 5.2+ and Node.js v18+, use the `using` keyword for deterministic cleanup:
+
+```typescript
+import * as fs from 'node:fs/promises';
+import { CredentioValidator } from '@ghchinoy/credentio-wasm';
+
+async function verifyLocalAsset(filePath: string) {
+  const buffer = await fs.readFile(filePath);
+
+  // Automatically invokes validator.close() upon exiting scope
+  using validator = await CredentioValidator.create();
+
+  const report = await validator.validateBytes(buffer);
+  console.log(`Engine:    ${report.engineName}`);
+  console.log(`Status:    ${report.badge.toUpperCase()}`);
+  console.log(`Core Time: ${((report.coreSeconds ?? 0) * 1000).toFixed(2)} ms`);
+}
+```
+
+---
+
+### Edge Runtimes (Cloudflare Workers, Deno, Bun)
+
+`@ghchinoy/credentio-wasm` is isomorphic and contains no native Node.js binary bindings (`node-gyp`). It runs directly inside modern edge runtimes:
+
+```typescript
+// cloudflare-worker.ts
+import { CredentioValidator } from '@ghchinoy/credentio-wasm';
+
+export default {
+  async fetch(request: Request): Promise<Response> {
+    if (request.method !== 'POST') {
+      return new Response('Send POST with media body', { status: 405 });
+    }
+
+    const mediaBuffer = await request.arrayBuffer();
+    const validator = await CredentioValidator.create();
+
+    try {
+      const report = await validator.validateBytes(mediaBuffer);
+      return Response.json(report);
+    } finally {
+      validator.close();
+    }
+  },
+};
+```
+
+---
+
+## 4. High-Level API Reference
+
+### `CredentioValidator`
+
+```typescript
+class CredentioValidator implements Disposable {
+  /** Creates and initializes a new validator instance. */
+  static create(options?: ValidatorOptions): Promise<CredentioValidator>;
+
+  /** Validates in-memory byte buffer (Uint8Array or ArrayBuffer). */
+  validateBytes(data: Uint8Array | ArrayBuffer, mediaType?: string): Promise<ProvenanceReport>;
+
+  /** Validates a Web standard Blob or File object. */
+  validateBlob(blob: Blob, mediaType?: string): Promise<ProvenanceReport>;
+
+  /** True if validator instance is open and active. */
+  readonly isOpen: boolean;
+
+  /** Releases WebAssembly heap memory and native validator handles. */
+  close(): void;
+
+  /** Explicit resource management hook for TypeScript 'using'. */
+  [Symbol.dispose](): void;
+}
+```
+
+### `ValidatorOptions`
+
+| Option | Type | Description |
+|---|---|---|
+| `claimSignerTrustPem` | `string` | Optional PEM certificate string containing trusted root CAs. |
+| `tsaTrustPem` | `string` | Optional PEM certificate string containing trusted TSA roots. |
+| `skipTrustChecks` | `boolean` | Skip root certificate anchor checks (defaults to `true` for development). |
+| `locateFile` | `(path: string, prefix: string) => string` | Custom hook to resolve path to `credentio.wasm`. |
+| `wasmBinary` | `Uint8Array \| ArrayBuffer` | Pre-fetched WebAssembly binary buffer. |
+
+---
+
+## 5. Data Models
+
+### `ProvenanceReport`
+
+```typescript
+interface ProvenanceReport {
+  engineId: string;                 // "credentio-wasm"
+  engineName: string;               // "Credentio WebAssembly"
+  hasCredentials: boolean;          // True if C2PA claim was detected
+  elapsedSeconds: number;           // Total wall-clock time
+  coreSeconds?: number;             // Native C++ engine verification time
+  mediaType?: string;               // IANA MIME type (e.g. "image/jpeg")
+  specVersion?: string;             // C2PA spec version (e.g. "2.2")
+  activeManifest?: Manifest;        // Most recent manifest
+  ingredientManifests: Manifest[];  // Historical ingredient manifests
+  rawJson?: string;                 // Raw crJSON string returned by engine
+  badge: BadgeState;                // 'signed' | 'unsigned' | 'invalid'
+  isVerified: boolean;              // True if badge is 'signed'
+  isInvalid: boolean;               // True if badge is 'invalid'
+  primaryClaimGenerator?: string;   // Generator software name
+  primarySignerIssuer?: string;     // Signer certificate authority
+}
+```
+
+### `Manifest`
+
+```typescript
+interface Manifest {
+  label: string;
+  title?: string;
+  format?: string;
+  claimGenerator?: string;
+  isUpdateManifest: boolean;
+  signature?: SignatureInfo;
+  assertions: Assertion[];
+  validationStatuses: ValidationStatus[];
+  overallValidity: BadgeState;
+}
+```
+
+### `SignatureInfo`
+
+```typescript
+interface SignatureInfo {
+  issuer?: string;
+  algorithm?: string;
+  time?: Date;
+  certChainSummary?: string;
+}
+```
+
+### `Assertion`
+
+```typescript
+type AssertionKind =
+  | 'actions'
+  | 'ingredient'
+  | 'thumbnail'
+  | 'ai_training_mining'
+  | 'metadata'
+  | 'hash'
+  | 'other';
+
+interface Assertion {
+  label: string;
+  kind: AssertionKind;
+  summary?: string;
+}
+```
+
+### `ValidationStatus`
+
+```typescript
+type Severity = 'info' | 'warning' | 'error';
+
+interface ValidationStatus {
+  code: string;
+  explanation?: string;
+  url?: string;
+  severity: Severity;
+}
+```
+
+---
+
+## 6. MIME Sniffing & crJSON Parsing
+
+### Magic Byte Sniffing
+
+Inspect binary headers to identify media types without file extensions:
+
+```typescript
+import { sniffMediaType } from '@ghchinoy/credentio-wasm';
+
+const jpegHeader = new Uint8Array([0xff, 0xd8, 0xff, 0xe0]);
+const mediaType = sniffMediaType(jpegHeader); // "image/jpeg"
+```
+
+### Standalone crJSON Parser
+
+If you receive raw crJSON strings from external microservices or CLI logs, deserialize them directly:
+
+```typescript
+import { parseCrJSON } from '@ghchinoy/credentio-wasm';
+
+const report = parseCrJSON(rawJsonString, 'image/png', 0.003, 0.002);
+console.log(report.badge); // "signed"
+```
+
+---
+
+## 7. Cross-Language Parity Matrix
+
+The TypeScript data models strictly align with the Python, Go, and Swift language bindings:
+
+| Domain Concept | TypeScript (`@ghchinoy/credentio-wasm`) | Python (`credentio`) | Go (`credentio/go`) | Swift (`CredentioKit`) |
+|---|---|---|---|---|
+| **Badge State** | `BadgeState` (`'signed' \| 'unsigned' \| 'invalid'`) | `BadgeState` | `BadgeState` | `CredentialBadgeState` |
+| **Severity** | `Severity` (`'info' \| 'warning' \| 'error'`) | `Severity` | `Severity` | `Severity` |
+| **Assertion Kind** | `AssertionKind` (7 variants) | `AssertionKind` | `AssertionKind` | `Assertion.Kind` |
+| **Report Model** | `ProvenanceReport` | `ProvenanceReport` | `ProvenanceReport` | `ProvenanceReport` |
+| **Manifest Model**| `Manifest` | `Manifest` | `Manifest` | `Manifest` |
+
+---
+
+## 8. Building from Source
+
+To compile the C++20 engine into WebAssembly and build the TypeScript SDK locally:
+
+```bash
+# 1. Compile Google Credentio C++20 into WebAssembly via Emscripten:
+make build-wasm
+
+# 2. Install TypeScript build dependencies:
+make wasm-install
+
+# 3. Compile TypeScript types and ES modules:
+make wasm-build
+
+# 4. Run the Vitest test suite:
+make wasm-test
+```

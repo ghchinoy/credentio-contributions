@@ -150,3 +150,34 @@ if report.hasCredentials {
     print("Signer Issuer:    \(report.activeManifest?.signature?.issuer ?? "Unknown")")
 }
 ```
+
+---
+
+## 7. WebAssembly & TypeScript Quick Start
+
+Install the `@ghchinoy/credentio-wasm` package:
+
+```bash
+npm install @ghchinoy/credentio-wasm
+```
+
+### In-Browser or Node.js Validation
+
+```typescript
+import { CredentioValidator } from '@ghchinoy/credentio-wasm';
+
+// Initialize the validator
+using validator = await CredentioValidator.create({ skipTrustChecks: true });
+
+// Validate in-memory bytes or Blob
+const report = await validator.validateBytes(mediaBuffer);
+
+if (report.hasCredentials) {
+  console.log(`Status:    ${report.badge.toUpperCase()}`);
+  console.log(`Generator: ${report.primaryClaimGenerator}`);
+  console.log(`Signer:    ${report.primarySignerIssuer}`);
+} else {
+  console.log('No C2PA Content Credentials found.');
+}
+```
+

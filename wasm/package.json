@@ -1,0 +1,46 @@
+{
+  "name": "@ghchinoy/credentio-wasm",
+  "version": "0.1.5",
+  "description": "Isomorphic WebAssembly and TypeScript SDK for Google Credentio C2PA verification",
+  "license": "Apache-2.0",
+  "author": "Google LLC",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ghchinoy/credentio-contributions.git",
+    "directory": "wasm"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./wasm": "./lib/credentio.wasm",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "lib",
+    "README.md",
+    "LICENSE",
+    "LICENSE.credentio"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0",
+    "vitest": "^2.1.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
