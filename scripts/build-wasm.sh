@@ -180,10 +180,18 @@ else
     "${CONTAINER_CLI}" volume create credentio-bazel-cache >/dev/null 2>&1 || true
   fi
 
+  # Optional container resource limits (defaults to host available capacity)
+  CONTAINER_RESOURCE_ARGS=()
+  if [[ -n "${WASM_BUILD_CPUS:-}" ]]; then
+    CONTAINER_RESOURCE_ARGS+=(--cpus "${WASM_BUILD_CPUS}")
+  fi
+  if [[ -n "${WASM_BUILD_MEM:-}" ]]; then
+    CONTAINER_RESOURCE_ARGS+=(-m "${WASM_BUILD_MEM}")
+  fi
+
   echo "==> Executing WebAssembly Bazel build inside container..."
   "${CONTAINER_CLI}" run --rm \
-    --cpus 8 \
-    -m 16G \
+    ${CONTAINER_RESOURCE_ARGS[@]+"${CONTAINER_RESOURCE_ARGS[@]}"} \
     -v credentio-bazel-cache:/root/.cache \
     -v "${REPO_DIR}/native:/workspace/native:ro" \
     -v "${STAGE_HOST_DIR}:/workspace/output:rw" \

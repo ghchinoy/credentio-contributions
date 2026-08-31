@@ -48,10 +48,14 @@ jobs:
         with:
           go-version: ${{ matrix.go-version }}
 
+      - name: Fetch prebuilt native library
+        run: |
+          ./scripts/fetch-prebuilt-lib.sh 0.1.5
+
       - name: Run Go tests
         run: |
           cd go
-          CGO_ENABLED=0 go test -v .
+          CGO_ENABLED=1 go test -v ./...
 
   swift:
     name: Swift (macOS)
