@@ -74,7 +74,7 @@ Install the package using your preferred package manager (or install directly fr
 ```bash
 npm install @ghchinoy/credentio-wasm
 # or install from release tarball:
-# npm install https://github.com/ghchinoy/credentio-contributions/releases/download/v0.1.7/ghchinoy-credentio-wasm-0.1.7.tgz
+# npm install https://github.com/ghchinoy/credentio-contributions/releases/download/v0.1.8/ghchinoy-credentio-wasm-0.1.8.tgz
 ```
 
 ---

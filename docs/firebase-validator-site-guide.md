@@ -46,7 +46,7 @@ This document outlines the scaffolding, architecture, and deployment procedures 
     "preview": "vite preview"
   },
   "dependencies": {
-    "@ghchinoy/credentio-wasm": "^0.1.7"
+    "@ghchinoy/credentio-wasm": "^0.1.8"
   },
   "devDependencies": {
     "typescript": "^5.7.0",

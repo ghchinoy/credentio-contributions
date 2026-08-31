@@ -192,7 +192,7 @@ Install the package (or release tarball):
 ```bash
 npm install @ghchinoy/credentio-wasm
 # or from release tarball:
-# npm install https://github.com/ghchinoy/credentio-contributions/releases/download/v0.1.7/ghchinoy-credentio-wasm-0.1.7.tgz
+# npm install https://github.com/ghchinoy/credentio-contributions/releases/download/v0.1.8/ghchinoy-credentio-wasm-0.1.8.tgz
 ```
 
 Validate a media blob or file in TypeScript / JavaScript:
@@ -248,7 +248,7 @@ See the [CLI Tutorial](https://ghchinoy.github.io/credentio-contributions/cli/) 
 
 Pre-compiled binary releases and source packages are distributed across multiple package ecosystems:
 
-- **WebAssembly/TypeScript (@ghchinoy/credentio-wasm):** Pre-compiled single-threaded WebAssembly package and binaries attached to GitHub Releases (`ghchinoy-credentio-wasm-0.1.7.tgz`, `credentio.wasm`, `credentio.js`). npm registry publication will follow upstream coordination.
+- **WebAssembly/TypeScript (@ghchinoy/credentio-wasm):** Pre-compiled single-threaded WebAssembly package and binaries attached to GitHub Releases (`ghchinoy-credentio-wasm-0.1.8.tgz`, `credentio.wasm`, `credentio.js`). npm registry publication will follow upstream coordination.
 - **Swift (CredentioKit):** Swift Package Manager remote binary package linking pre-compiled `CredentioC.xcframework` (macOS arm64 prebuilt today; iOS and universal binaries build from source).
 - **Python (credentio):** Pre-compiled binary wheels attached to GitHub Releases (macOS arm64 and Linux x86_64). PyPI registry publication is coming soon.
 - **Go:** Standard Go module with automated prebuilt library download via `make fetch-lib` (macOS arm64 and Linux x86_64) or direct compilation from source.
