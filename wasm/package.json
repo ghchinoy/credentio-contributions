@@ -1,6 +1,6 @@
 {
   "name": "@ghchinoy/credentio-wasm",
-  "version": "0.1.5",
+  "version": "0.1.7",
   "description": "Isomorphic WebAssembly and TypeScript SDK for Google Credentio C2PA verification",
   "license": "Apache-2.0",
   "author": "Google LLC",

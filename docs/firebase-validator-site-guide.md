@@ -26,7 +26,7 @@ This document outlines the scaffolding, architecture, and deployment procedures 
 
 - **Client-Side Execution:** Media validation runs 100% locally in the browser via WebAssembly (`@ghchinoy/credentio-wasm`). Zero bytes leave the client.
 - **Single-Threaded Engine:** Compiled with `-sUSE_PTHREADS=0`, enabling universal browser execution without requiring `Cross-Origin-Opener-Policy` (COOP) or `Cross-Origin-Embedder-Policy` (COEP) headers.
-- **Static Asset Hosting:** Hosted via Google Firebase Hosting with global CDN caching.
+- **Static Asset Hosting:** Hosted via Google Firebase Hosting at `https://credentio-validator.web.app/` with global CDN caching.
 
 ---
 
@@ -46,7 +46,7 @@ This document outlines the scaffolding, architecture, and deployment procedures 
     "preview": "vite preview"
   },
   "dependencies": {
-    "@ghchinoy/credentio-wasm": "^0.1.5"
+    "@ghchinoy/credentio-wasm": "^0.1.7"
   },
   "devDependencies": {
     "typescript": "^5.7.0",
