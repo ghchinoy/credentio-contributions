@@ -12,6 +12,7 @@ This repository provides native language bindings for [Google Credentio](https:/
 - **`python/`**: Python package (`credentio`) using `cffi`, typed dataclasses, and CLI entry point.
 - **`go/`**: Go package (`github.com/ghchinoy/credentio-contributions/go`) using `cgo` and standalone CLI.
 - **`swift/`**: Standalone SwiftPM package (`CredentioKit`) with actor-isolated native engines and CLI.
+- **`wasm/`**: Isomorphic TypeScript SDK (`@ghchinoy/credentio-wasm`) and Emscripten WebAssembly build.
 - **`docs-site/`**: Interactive documentation portal built with [Astro Starlight](https://starlight.astro.build/) and the Catppuccin theme.
 - **`docs/`**: Developer architecture guides and Architecture Decision Records (`docs/adr/`).
 - **`scripts/`**: Automation scripts for building shared libraries and XCFrameworks via Bazel.

@@ -3,7 +3,7 @@ title: Contributing & Upstreaming
 description: How to contribute to this project and path toward upstreaming bindings to Google Credentio.
 ---
 
-We welcome contributions, bug reports, and optimizations for the Python, Go, and Swift Credentio bindings!
+We welcome contributions, bug reports, and optimizations for the Python, Go, Swift, and WebAssembly/TypeScript Credentio bindings!
 
 Please review our root [Contributing Guidelines](https://github.com/ghchinoy/credentio-contributions/blob/main/CONTRIBUTING.md) and [Code of Conduct](https://github.com/ghchinoy/credentio-contributions/blob/main/CODE_OF_CONDUCT.md).
 
@@ -11,10 +11,11 @@ Please review our root [Contributing Guidelines](https://github.com/ghchinoy/cre
 
 ## 1. Development Workflow
 
-### Building Native Libraries
+### Building Native and WebAssembly Libraries
 ```bash
-make build-lib    # For Python and Go
-make build-swift  # For Swift (macOS only)
+make build-lib    # For Python and Go (libcredentio_c.dylib / .so)
+make build-swift  # For Swift (CredentioC.xcframework)
+make wasm-build   # For WebAssembly / TypeScript (@ghchinoy/credentio-wasm)
 ```
 
 ### Running Tests
@@ -23,6 +24,9 @@ make build-swift  # For Swift (macOS only)
 make python-test  # Python (pytest)
 make go-test      # Go (go test)
 make swift-test   # Swift (swift test)
+make wasm-test    # WebAssembly & TypeScript (vitest)
+make test         # Run all test suites
+```
 ```
 
 ---

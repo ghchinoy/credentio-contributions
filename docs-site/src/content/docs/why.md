@@ -1,6 +1,6 @@
 ---
 title: Why Credentio Bindings?
-description: Background, local-first design principles, and why Python, Go, and Swift bindings were created.
+description: Background, local-first design principles, and why Python, Go, Swift, and WebAssembly bindings were created.
 ---
 
 In August 2026, Google announced [Credentio on the Google Developers Blog](https://developers.googleblog.com/introducing-credentio-open-source-c-library-for-c2pa-content-credentials-from-google/), introducing an open-source C++ library designed for verifying [C2PA Content Credentials](https://c2pa.org/).

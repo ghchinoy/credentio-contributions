@@ -1,9 +1,9 @@
 ---
 title: Quick Start
-description: Build native Credentio libraries and run Python, Go, and Swift validation in minutes.
+description: Build native Credentio libraries and run Python, Go, Swift, and WebAssembly validation in minutes.
 ---
 
-Follow this guide to set up Google Credentio, compile the native libraries, and validate C2PA assets across Python, Go, or Swift.
+Follow this guide to set up Google Credentio, compile the native libraries, and validate C2PA assets across Python, Go, Swift, or WebAssembly/TypeScript.
 
 ---
 

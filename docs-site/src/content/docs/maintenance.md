@@ -5,7 +5,7 @@ description: Baseline pinning, drift detection workflows, and scheduled CI track
 
 Google Credentio is actively developed at `HEAD` on [Google's official repository](https://mediaprovenance.googlesource.com/credentio/).
 
-To insulate downstream Python, Go, and Swift applications from unexpected upstream schema or C++ API breaking changes, `credentio-contributions` maintains an authoritative, pinned baseline commit.
+To insulate downstream Python, Go, Swift, and WebAssembly applications from unexpected upstream schema or C++ API breaking changes, `credentio-contributions` maintains an authoritative, pinned baseline commit.
 
 ---
 
@@ -17,7 +17,7 @@ The repository root contains a `.credentio-pin` file containing the validated co
 4ac69fc58256d3871e765f615254373e19e250e9
 ```
 
-All build scripts (`scripts/build-shared-lib.sh`, `scripts/build-swift-xcframework.sh`) and CI release workflows dynamically source this file when cloning upstream Credentio during automated builds.
+All build scripts (`scripts/build-shared-lib.sh`, `scripts/build-swift-xcframework.sh`, `scripts/build-wasm.sh`) and CI release workflows dynamically source this file when cloning upstream Credentio during automated builds.
 
 You can override the pinned baseline locally by exporting the `CREDENTIO_SHA` environment variable:
 

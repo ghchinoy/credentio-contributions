@@ -3,7 +3,7 @@
 [![CI](https://github.com/ghchinoy/credentio-contributions/actions/workflows/ci.yml/badge.svg)](https://github.com/ghchinoy/credentio-contributions/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
-Idiomatic, high-performance **Python**, **Go**, and **Swift** bindings for [Google Credentio](https://mediaprovenance.googlesource.com/credentio/), the C2PA Content Credentials validator.
+Idiomatic, high-performance **Python**, **Go**, **Swift**, and **WebAssembly/TypeScript** bindings for [Google Credentio](https://mediaprovenance.googlesource.com/credentio/), the C2PA Content Credentials validator.
 
 ---
 
@@ -17,6 +17,8 @@ Idiomatic, high-performance **Python**, **Go**, and **Swift** bindings for [Goog
   - [Step 2: Python Usage](#step-2-python-usage)
   - [Step 3: Go Usage](#step-3-go-usage)
   - [Step 4: Swift Usage](#step-4-swift-usage)
+  - [Step 5: WebAssembly / TypeScript Usage](#step-5-webassembly--typescript-usage)
+  - [Step 6: Command-Line Interface (CLI)](#step-6-command-line-interface-cli)
 - [Distribution Status](#distribution-status)
 - [Documentation Portal](#documentation-portal)
 - [Contributing](#contributing)
@@ -28,8 +30,9 @@ Idiomatic, high-performance **Python**, **Go**, and **Swift** bindings for [Goog
 
 [Google Credentio](https://mediaprovenance.googlesource.com/credentio/) is an open-source C++ library for verifying [C2PA Content Credentials](https://c2pa.org/) locally in-process without network overhead.
 
-This repository provides language bindings built on top of a unified C-ABI bridge (`libcredentio_c` / `CredentioC.xcframework`), bringing sub-millisecond local provenance validation to:
+This repository provides language bindings built on top of a unified C-ABI bridge (`libcredentio_c` / `CredentioC.xcframework` / `credentio.wasm`), bringing sub-millisecond local provenance validation to:
 
+- 🌐 **WebAssembly/TypeScript (`@ghchinoy/credentio-wasm`)**: Isomorphic single-threaded WebAssembly package for browsers, web workers, Node.js, and edge runtimes.
 - 🐍 **Python (`credentio`)**: `cffi`-based library with typed dataclasses, context managers, and zero runtime dependencies.
 - 🐹 **Go (`github.com/ghchinoy/credentio-contributions/go`)**: `cgo`-based package with thread-safe validators, `encoding/json` models, and functional options.
 - 🍏 **Swift (`CredentioKit`)**: Actor-isolated Swift 6 package supporting macOS 14+ and iOS 16+ (prebuilt binaries currently ship macOS arm64; other targets build from source).
@@ -45,6 +48,7 @@ This repository provides language bindings built on top of a unified C-ABI bridg
   - Python 3.9+ with `pip`
   - Go 1.21+
   - Xcode 16+ (for Swift / macOS / iOS builds)
+  - Node.js 18+ with `npm` (for WebAssembly / TypeScript SDK)
 
 > **Note on Prebuilt Binaries:** Pre-compiled release binaries currently target **macOS (arm64)** and **Linux (x86_64)**. Other architectures (such as Intel Mac, Linux aarch64, or iOS devices) can be compiled directly from source using the prerequisites above.
 
@@ -182,7 +186,46 @@ make swift-test
 
 ---
 
-### Step 5: Command-Line Interface (CLI)
+### Step 5: WebAssembly / TypeScript Usage
+
+Install the package (or release tarball):
+```bash
+npm install @ghchinoy/credentio-wasm
+# or from release tarball:
+# npm install https://github.com/ghchinoy/credentio-contributions/releases/download/v0.1.7/ghchinoy-credentio-wasm-0.1.7.tgz
+```
+
+Validate a media blob or file in TypeScript / JavaScript:
+```typescript
+import { CredentioValidator } from '@ghchinoy/credentio-wasm';
+
+// Initialize the single-threaded WebAssembly engine
+const validator = await CredentioValidator.create({ skipTrustChecks: true });
+
+try {
+  const report = await validator.validateBlob(fileBlob);
+
+  if (report.hasCredentials) {
+    console.log(`Status:    ${report.badge.toUpperCase()}`); // 'SIGNED', 'UNSIGNED', 'INVALID'
+    console.log(`Generator: ${report.activeManifest?.claimGenerator}`);
+    console.log(`Signer:    ${report.activeManifest?.signature?.issuer}`);
+    console.log(`Core Time: ${(report.coreSeconds * 1000).toFixed(2)} ms`);
+  } else {
+    console.log('No C2PA Content Credentials found.');
+  }
+} finally {
+  validator.dispose();
+}
+```
+
+Run TypeScript and WebAssembly tests:
+```bash
+make wasm-test
+```
+
+---
+
+### Step 6: Command-Line Interface (CLI)
 
 Each language provides a standalone command-line validator implementing standard exit codes (`0=Signed`, `1=Unsigned`, `2=Invalid`):
 
@@ -205,6 +248,7 @@ See the [CLI Tutorial](https://ghchinoy.github.io/credentio-contributions/cli/) 
 
 Pre-compiled binary releases and source packages are distributed across multiple package ecosystems:
 
+- **WebAssembly/TypeScript (@ghchinoy/credentio-wasm):** Pre-compiled single-threaded WebAssembly package and binaries attached to GitHub Releases (`ghchinoy-credentio-wasm-0.1.7.tgz`, `credentio.wasm`, `credentio.js`). npm registry publication will follow upstream coordination.
 - **Swift (CredentioKit):** Swift Package Manager remote binary package linking pre-compiled `CredentioC.xcframework` (macOS arm64 prebuilt today; iOS and universal binaries build from source).
 - **Python (credentio):** Pre-compiled binary wheels attached to GitHub Releases (macOS arm64 and Linux x86_64). PyPI registry publication is coming soon.
 - **Go:** Standard Go module with automated prebuilt library download via `make fetch-lib` (macOS arm64 and Linux x86_64) or direct compilation from source.
@@ -219,8 +263,10 @@ This project includes an interactive [Astro Starlight](https://starlight.astro.b
 make docs-serve
 ```
 
+- [Live Web Validator](https://credentio-validator.web.app/): Standalone in-browser C2PA validator app powered by `@ghchinoy/credentio-wasm`.
 - [Developer Guide](docs/developers_guide.md): Comprehensive guide to the C-ABI bridge, XCFramework build, and architecture.
 - [ADR-0001: Shared C-ABI Strategy](docs/adr/0001-shared-c-abi-bindings.md): Architectural decision record for multi-language FFI.
+- [ADR-0002: WebAssembly / Emscripten Bindings](docs/adr/0002-webassembly-emscripten-bindings.md): Architectural decision record for browser and Node.js WebAssembly compilation.
 - [Maintenance & Drift Detection](https://ghchinoy.github.io/credentio-contributions/maintenance/): Authoritative baseline pinning (`.credentio-pin`), `make check-drift`, and automated CI tracking.
 
 ---

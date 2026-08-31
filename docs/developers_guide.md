@@ -1,6 +1,6 @@
-# Developer Guide: Credentio Python, Go, and Swift Bindings
+# Developer Guide: Credentio Python, Go, Swift, and WebAssembly Bindings
 
-This guide details the internal architecture, C-ABI interface, upstream Credentio setup, build workflows, and packaging for the Python, Go, and Swift bindings of Google Credentio.
+This guide details the internal architecture, C-ABI interface, upstream Credentio setup, build workflows, and packaging for the Python, Go, Swift, and WebAssembly/TypeScript bindings of Google Credentio.
 
 ---
 
@@ -57,7 +57,7 @@ bazel test ...
 
 ## 2. C-ABI Bridge (`native/`)
 
-To insulate Python, Go, and Swift from C++20 standard library templates, Protocol Buffers, and Abseil data structures, a unified `extern "C"` wrapper is implemented in `native/credentio_c.h` and `native/credentio_c.cc`.
+To insulate Python, Go, Swift, and WebAssembly from C++20 standard library templates, Protocol Buffers, and Abseil data structures, a unified `extern "C"` wrapper is implemented in `native/credentio_c.h` and `native/credentio_c.cc`.
 
 ### Functions Exported:
 - `cr_validator_create(claim_pem, tsa_pem, skip_trust)`: Initializes an `AssetValidatorImpl` instance with `DefaultCryptoReadHandler`.
@@ -157,9 +157,23 @@ make swift-test
 
 ---
 
-## 8. Command-Line Tools & Scripts
+## 8. WebAssembly / TypeScript Binding (`wasm/`)
 
-All three bindings expose thin CLI entry points:
+- Compiles the exact same C-ABI layer via Emscripten and Bazel (`@emsdk//:platform_wasm`) into `credentio.wasm` and `credentio.js`.
+- Configured as single-threaded (`-sUSE_PTHREADS=0`) to enable execution in standard browser contexts without cross-origin isolation headers (COOP/COEP).
+- Exposes isomorphic `CredentioValidator` class in TypeScript supporting `validateBytes()`, `validateBlob()`, and `validateFile()`.
+- Implements `parseCrJSON` supporting C2PA v1 and v2 claim schemas, X.509 certificate chains, and assertion classifications.
+
+To test:
+```bash
+make wasm-test
+```
+
+---
+
+## 9. Command-Line Tools & Scripts
+
+All native bindings expose thin CLI entry points:
 - **Python:** `credentio.cli:main` registered as console script `credentio` via `pyproject.toml`.
 - **Go:** `go/cmd/credentio/main.go` producing executable binary `credentio`.
 - **Swift:** `swift/Sources/credentio-cli` built with `swift-argument-parser` producing `credentio-cli`.
