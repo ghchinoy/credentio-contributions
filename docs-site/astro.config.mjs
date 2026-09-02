@@ -46,6 +46,12 @@ export default defineConfig({
 					],
 				},
 				{
+					label: 'Agent Ecosystem',
+					items: [
+						{ label: 'Agent Plugin & Skill', slug: 'agent-plugin' },
+					],
+				},
+				{
 					label: 'Language Bindings',
 					items: [
 						{ label: 'Python (credentio)', slug: 'python' },

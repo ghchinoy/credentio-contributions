@@ -63,13 +63,26 @@ Verify C2PA Content Credentials directly in your application without network rou
     print("Status:", report.badge.rawValue.uppercased()) // "SIGNED", "UNSIGNED", "INVALID"
     ```
   </TabItem>
+
+  <TabItem label="Agent Skill (CLI)" icon="puzzle">
+    ```bash
+    # Run autonomous multi-asset audit with AI provenance filtering
+    python3 plugins/c2pa-inspector/skills/c2pa-inspect/scripts/inspect_c2pa.py \
+      --dir ./assets --recursive --filter ai-only --json
+    ```
+  </TabItem>
 </Tabs>
 
 ---
 
-## Choose Your Language
+## Choose Your Integration
 
 <CardGrid>
+  <LinkCard
+    title="Agent Plugin & Skill"
+    description="Autonomous C2PA auditing, batch scanning, and AI training/inference consent analysis."
+    href="/credentio-contributions/agent-plugin/"
+  />
   <LinkCard
     title="WebAssembly (TypeScript)"
     description="Isomorphic WASM package for browsers, workers, Node.js, and edge runtimes."
