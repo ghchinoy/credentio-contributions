@@ -10,14 +10,14 @@ The `credentio` Python package provides typed, in-process C2PA verification powe
 ## 1. Installation
 
 ### Prebuilt Binary Wheels (macOS arm64 & Linux x86_64)
-Pre-compiled wheels with bundled `libcredentio_c` native libraries are attached to [GitHub Releases](https://github.com/ghchinoy/credentio-contributions/releases/tag/v0.1.9):
+Pre-compiled wheels with bundled `libcredentio_c` native libraries are attached to [GitHub Releases](https://github.com/ghchinoy/credentio-contributions/releases/tag/v0.2.0):
 
 ```bash
 # Example (macOS Apple Silicon, Python 3.11):
-pip install https://github.com/ghchinoy/credentio-contributions/releases/download/v0.1.9/credentio-0.1.9-cp311-cp311-macosx_11_0_arm64.whl
+pip install https://github.com/ghchinoy/credentio-contributions/releases/download/v0.2.0/credentio-0.2.0-cp311-cp311-macosx_11_0_arm64.whl
 
 # Example (Linux x86_64, Python 3.11):
-pip install https://github.com/ghchinoy/credentio-contributions/releases/download/v0.1.9/credentio-0.1.9-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
+pip install https://github.com/ghchinoy/credentio-contributions/releases/download/v0.2.0/credentio-0.2.0-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
 ```
 
 ### Build from Source (Editable Mode)
