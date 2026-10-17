@@ -16,13 +16,13 @@ limitations under the License.
 
 # @ghchinoy/credentio-wasm
 
-> Isomorphic WebAssembly and TypeScript SDK for [Google Credentio](https://mediaprovenance.googlesource.com/credentio) C2PA Content Credentials verification.
+> Isomorphic WebAssembly and TypeScript SDK for [Google Credentio](https://mediaprovenance.googlesource.com/credentio) C2PA Content Credentials verification and signing.
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7+-blue.svg)](https://www.typescriptlang.org/)
 [![WebAssembly](https://img.shields.io/badge/WebAssembly-WASM-654FF0.svg)](https://webassembly.org/)
 
-This package brings the high-performance C++20 C2PA validation engine from Google Credentio to the JavaScript and TypeScript ecosystem. It runs natively across modern **Web Browsers**, **Web Workers**, **Node.js (v18+)**, and **Edge Runtimes** (Cloudflare Workers, Deno, Bun).
+This package brings the high-performance C++20 C2PA validation and signing engine from Google Credentio to the JavaScript and TypeScript ecosystem. It runs natively across modern **Web Browsers**, **Web Workers**, **Node.js (v18+)**, and **Edge Runtimes** (Cloudflare Workers, Deno, Bun).
 
 > **Disclaimer:** This project is an open-source community contribution and is not an officially supported Google product. Authoritative C++ source and specifications live in [Google Credentio](https://mediaprovenance.googlesource.com/credentio).
 
@@ -30,7 +30,7 @@ This package brings the high-performance C++20 C2PA validation engine from Googl
 
 ## Key Features
 
-- **Dual-Layer Architecture**: Use the ergonomic async `CredentioValidator` class or dive into low-level memory allocations with `CredentioWasmBridge`.
+- **In-Process Validation & Signing**: Verify existing manifests with `CredentioValidator` or embed and sign new C2PA manifests client-side with `CredentioSigner`.
 - **Isomorphic and Universal**: Operates seamlessly in browser client apps, server-side Node.js pipelines, and edge compute workers without platform-specific dependencies.
 - **Strict Cross-Language Schema Parity**: Data models (`ProvenanceReport`, `Manifest`, `Assertion`, `ValidationStatus`) strictly mirror the Python (`credentio`), Go (`credentio-contributions/go`), and Swift (`CredentioKit`) language bindings.
 - **C2PA Schema Resilience**: Accommodates C2PA v1 (`claim`) and v2 (`claim.v2`) schemas, dictionary and array manifest representations, X.509 certificate chains, and generator version deduplication.
@@ -138,6 +138,24 @@ async function verifyAsset(filePath: string) {
   console.log(`Badge State: ${report.badge}`);
   console.log(`Has Credentials: ${report.hasCredentials}`);
 }
+```
+
+### 3. Client-Side C2PA Signing (`CredentioSigner`)
+
+```typescript
+import { CredentioSigner } from '@ghchinoy/credentio-wasm';
+
+using signer = await CredentioSigner.create({
+  claimSignerKeyPem,
+  claimSignerCertPem,
+  generatorName: 'MyWebStudio',
+  generatorVersion: '0.2.0',
+});
+
+const { signedBytes, coreSeconds } = await signer.signBytes(imageBytes, {
+  mediaType: 'image/png',
+  digitalSourceType: 'http://cv.iptc.org/newscodes/digitalsourcetype/digitalCapture',
+});
 ```
 
 ---

@@ -1,6 +1,8 @@
 # Credentio Python Binding
 
-High-performance Python bindings for [Google Credentio](https://mediaprovenance.googlesource.com/credentio/) C2PA Content Credentials validator.
+High-performance Python bindings for [Google Credentio](https://mediaprovenance.googlesource.com/credentio/) C2PA Content Credentials validator and signer.
+
+> **Disclaimer:** This project is an open-source community contribution and is not an officially supported Google product.
 
 ## Installation
 
@@ -14,6 +16,8 @@ pip install https://github.com/ghchinoy/credentio-contributions/releases/downloa
 > **Note:** Direct `pip install credentio` via PyPI is coming soon once Trusted Publishing is finalized.
 
 ## Quickstart
+
+### 1. Validate Media Assets
 
 ```python
 from credentio import Validator
@@ -30,4 +34,37 @@ with Validator() as validator:
         print(f"Validation time: {report.core_seconds * 1000:.2f} ms")
     else:
         print("No content credentials found.")
+```
+
+### 2. Sign Media Assets In-Process
+
+```python
+from credentio import Signer
+
+with Signer(
+    claim_signer_key_pem=key_pem,
+    claim_signer_cert_pem=cert_pem,
+    generator_name="MyPythonApp",
+    generator_version="0.2.0",
+) as signer:
+    res = signer.sign_file(
+        "input.png",
+        "signed.png",
+        digital_source_type="http://cv.iptc.org/newscodes/digitalsourcetype/digitalCapture",
+        custom_assertions={
+            "c2pa.training-mining": {
+                "entries": {
+                    "c2pa.ai_generative_training": {"use": "notAllowed"}
+                }
+            }
+        },
+    )
+    print(f"Signed {res.byte_size} bytes in {res.core_seconds * 1000:.2f} ms")
+```
+
+### 3. Command-Line Interface
+
+```bash
+credentio validate photo.jpg [--json]
+credentio sign input.png -o signed.png --key claim_signer_key.pem --cert claim_signer_cert.pem [--json]
 ```

@@ -1,11 +1,11 @@
 ---
 title: Command-Line Tools & Tutorial
-description: Hands-on CLI tutorial for validating C2PA Content Credentials in Python, Go, and Swift.
+description: Hands-on CLI tutorial for validating and signing C2PA Content Credentials in Python, Go, and Swift.
 ---
 
 import { Tabs, TabItem } from '@astrojs/starlight/components';
 
-This tutorial guides you through installing, building, and running the `credentio validate` command-line tool across **Python**, **Go**, and **Swift**.
+This tutorial guides you through installing, building, and running the `credentio validate`, `credentio sign`, and `credentio keygen` command-line tools across **Python**, **Go**, and **Swift**.
 
 ---
 
@@ -152,7 +152,51 @@ curl -sLO https://raw.githubusercontent.com/c2pa-org/conformance-public/main/tes
 
 ---
 
-## 3. Standard Exit Codes
+## 3. Generating Test Keys & Signing Assets (`keygen` & `sign`)
+
+All three CLIs support embedding and signing C2PA Content Credentials in-process.
+
+### Step 1: Generate a Local C2PA Test PKI (Go CLI)
+Generate an EC P-256 Root CA, Claim Signer key/certificate (with C2PA EKU `1.3.6.1.4.1.62558.2.1`), and RFC 3161 TSA key/certificate:
+
+```bash
+./bin/credentio keygen -out-dir ./test_pki
+```
+
+### Step 2: Sign a Media Asset by Language
+
+<Tabs>
+  <TabItem label="Go" icon="seti:go">
+    ```bash
+    # Sign with explicit test PKI (or omit -key/-cert to use an ephemeral test PKI):
+    ./bin/credentio sign input.png -o signed.png \
+      -key ./test_pki/claim_signer_key.pem \
+      -cert ./test_pki/claim_signer_cert.pem \
+      -source-type capture
+    ```
+  </TabItem>
+
+  <TabItem label="Python" icon="seti:python">
+    ```bash
+    credentio sign input.png -o signed.png \
+      --key ./test_pki/claim_signer_key.pem \
+      --cert ./test_pki/claim_signer_cert.pem \
+      --source-type http://cv.iptc.org/newscodes/digitalsourcetype/digitalCapture
+    ```
+  </TabItem>
+
+  <TabItem label="Swift" icon="apple">
+    ```bash
+    cd swift && swift run credentio-cli sign ../input.png -o ../signed.png \
+      --key ../test_pki/claim_signer_key.pem \
+      --cert ../test_pki/claim_signer_cert.pem
+    ```
+  </TabItem>
+</Tabs>
+
+---
+
+## 4. Standard Exit Codes
 
 All three command-line tools implement standard Unix exit codes for shell scripting and CI automation:
 

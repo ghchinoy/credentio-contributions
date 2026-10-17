@@ -7,8 +7,8 @@ High-performance native Swift bindings for [Google Credentio](https://mediaprove
 ## 🚀 Overview
 
 `CredentioKit` provides:
-- **In-process C2PA validation**: Sub-millisecond core verification running directly via a C-ABI static XCFramework (`CredentioC.xcframework`).
-- **Sendable & Actor-isolated**: Pure Swift 6 concurrency safety.
+- **In-process C2PA validation & signing**: Sub-millisecond core verification and manifest signing running directly via a C-ABI static XCFramework (`CredentioC.xcframework`).
+- **Sendable & Actor-isolated**: Pure Swift 6 concurrency safety (`CredentioNativeEngine` and `CredentioSigner`).
 - **App Sandbox Compliant**: In-process engine requires zero child subprocesses or sandbox entitlements.
 - **Pure Swift Fallback**: Compiles immediately with zero C++ toolchain requirements for CLI/crJSON workflows.
 - **Built-in Format Detection**: `SupportedFormats` helper for image, video, audio, and document validation.
@@ -77,4 +77,17 @@ if report.hasCredentials {
 } else {
     print("No C2PA Content Credentials found.")
 }
+
+// 4. Sign a media file in-process
+let signer = try CredentioSigner(
+    claimSignerKeyPEM: keyPEM,
+    claimSignerCertPEM: certPEM,
+    generatorName: "MyMacApp",
+    generatorVersion: "0.2.0"
+)
+let signRes = try await signer.sign(
+    inputURL: URL(fileURLWithPath: "input.png"),
+    outputURL: URL(fileURLWithPath: "signed.png")
+)
+print("Signed \(signRes.byteSize) bytes")
 ```

@@ -9,10 +9,11 @@ Google Credentio is authored in C++20. To provide seamless bindings for Python, 
 
 ## 1. The C-ABI Interface (`native/credentio_c.h`)
 
-The C-ABI exposes an opaque pointer model:
+The C-ABI exposes opaque pointer handles for both validation (`cr_validator`) and signing (`cr_signer`):
 
 ```c
 typedef struct cr_validator cr_validator;
+typedef struct cr_signer cr_signer;
 
 CR_EXPORT cr_validator* cr_validator_create(
     const char* claim_signer_trust_pem,
@@ -34,9 +35,40 @@ CR_EXPORT char* cr_validate_bytes(
     const char* media_type,
     int* out_status);
 
+CR_EXPORT cr_signer* cr_signer_create(
+    const char* claim_signer_key_pem,
+    const char* claim_signer_cert_pem,
+    const char* tsa_key_pem,
+    const char* tsa_cert_pem,
+    const char* generator_name,
+    const char* generator_version);
+
+CR_EXPORT void cr_signer_free(cr_signer* signer);
+
+CR_EXPORT int cr_sign_file(
+    cr_signer* signer,
+    const char* input_path,
+    const char* output_path,
+    const char* media_type,
+    const char* digital_source_type,
+    const char* custom_assertions_json);
+
+CR_EXPORT uint8_t* cr_sign_bytes(
+    cr_signer* signer,
+    const uint8_t* bytes,
+    size_t count,
+    const char* media_type,
+    const char* digital_source_type,
+    const char* custom_assertions_json,
+    size_t* out_size,
+    int* out_status);
+
 CR_EXPORT const char* cr_last_error(cr_validator* validator);
 CR_EXPORT double cr_last_internal_seconds(cr_validator* validator);
+CR_EXPORT const char* cr_signer_last_error(cr_signer* signer);
+CR_EXPORT double cr_signer_last_internal_seconds(cr_signer* signer);
 CR_EXPORT void cr_string_free(char* str);
+CR_EXPORT void cr_bytes_free(uint8_t* bytes);
 ```
 
 ---

@@ -3,7 +3,7 @@
 [![CI](https://github.com/ghchinoy/credentio-contributions/actions/workflows/ci.yml/badge.svg)](https://github.com/ghchinoy/credentio-contributions/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
-Idiomatic, high-performance **Python**, **Go**, **Swift**, and **WebAssembly/TypeScript** bindings for [Google Credentio](https://mediaprovenance.googlesource.com/credentio/), the C2PA Content Credentials validator.
+Idiomatic, high-performance **Python**, **Go**, **Swift**, and **WebAssembly/TypeScript** bindings for [Google Credentio](https://mediaprovenance.googlesource.com/credentio/), the C2PA Content Credentials validator and signer.
 
 ---
 
@@ -28,9 +28,9 @@ Idiomatic, high-performance **Python**, **Go**, **Swift**, and **WebAssembly/Typ
 
 ## Overview
 
-[Google Credentio](https://mediaprovenance.googlesource.com/credentio/) is an open-source C++ library for verifying [C2PA Content Credentials](https://c2pa.org/) locally in-process without network overhead.
+[Google Credentio](https://mediaprovenance.googlesource.com/credentio/) is an open-source C++ library for verifying and signing [C2PA Content Credentials](https://c2pa.org/) locally in-process without network overhead.
 
-This repository provides language bindings built on top of a unified C-ABI bridge (`libcredentio_c` / `CredentioC.xcframework` / `credentio.wasm`), bringing sub-millisecond local provenance validation to:
+This repository provides language bindings built on top of a unified C-ABI bridge (`libcredentio_c` / `CredentioC.xcframework` / `credentio.wasm`), bringing sub-millisecond local provenance validation and signing to:
 
 - 🌐 **WebAssembly/TypeScript (`@ghchinoy/credentio-wasm`)**: Isomorphic single-threaded WebAssembly package for browsers, web workers, Node.js, and edge runtimes.
 - 🐍 **Python (`credentio`)**: `cffi`-based library with typed dataclasses, context managers, and zero runtime dependencies.
@@ -112,6 +112,15 @@ with Validator(skip_trust_checks=True) as validator:
         print("No C2PA Content Credentials found.")
 ```
 
+Sign a media file in-process:
+```python
+from credentio import Signer
+
+with Signer(claim_signer_key_pem=key_pem, claim_signer_cert_pem=cert_pem) as signer:
+    res = signer.sign_file("input.png", "signed.png")
+    print(f"Signed {res.byte_size} bytes in {res.core_seconds * 1000:.2f} ms")
+```
+
 Run Python tests:
 ```bash
 make python-test
@@ -154,6 +163,21 @@ func main() {
 }
 ```
 
+Generate a C2PA test PKI and sign an asset in Go:
+```go
+pki, _ := credentio.GenerateTestPKI("My Organization")
+signer, _ := credentio.NewSigner(
+	pki.ClaimSignerKeyPEM,
+	pki.ClaimSignerCertPEM,
+	credentio.WithTSACredentials(pki.TSAKeyPEM, pki.TSACertPEM),
+)
+defer signer.Close()
+
+res, _ := signer.SignFile("input.png", "signed.png", &credentio.SignParams{
+	DigitalSourceType: credentio.DigitalSourceTypeDigitalCapture,
+})
+```
+
 Run Go tests:
 ```bash
 make go-test
@@ -177,6 +201,13 @@ if report.hasCredentials {
     print("Generator: \(report.activeManifest?.claimGenerator ?? "Unknown")")
     print("Signer:    \(report.activeManifest?.signature?.issuer ?? "Unknown")")
 }
+
+// Sign a media asset in-process:
+let signer = try CredentioSigner(claimSignerKeyPEM: keyPEM, claimSignerCertPEM: certPEM)
+let signRes = try await signer.sign(
+    inputURL: URL(fileURLWithPath: "input.png"),
+    outputURL: URL(fileURLWithPath: "signed.png")
+)
 ```
 
 Run Swift tests:
@@ -227,16 +258,20 @@ make wasm-test
 
 ### Step 6: Command-Line Interface (CLI)
 
-Each language provides a standalone command-line validator implementing standard exit codes (`0=Signed`, `1=Unsigned`, `2=Invalid`):
+Each language provides a standalone command-line validator and signer implementing standard exit codes (`0=Signed`, `1=Unsigned`, `2=Invalid`):
 
 ```bash
-# Python CLI:
+# Generate a local C2PA test PKI (Go CLI):
+./bin/credentio keygen -out-dir ./test_pki
+
+# Sign an asset:
+credentio sign input.png -o signed.png --key ./test_pki/claim_signer_key.pem --cert ./test_pki/claim_signer_cert.pem
+./bin/credentio sign input.png -o signed.png -key ./test_pki/claim_signer_key.pem -cert ./test_pki/claim_signer_cert.pem
+cd swift && swift run credentio-cli sign ../input.png -o ../signed.png --key ../test_pki/claim_signer_key.pem --cert ../test_pki/claim_signer_cert.pem
+
+# Validate an asset:
 credentio validate photo.jpg [--json]
-
-# Go CLI:
 ./bin/credentio validate photo.jpg [-json]
-
-# Swift CLI:
 cd swift && swift run credentio-cli validate ../photo.jpg [--json]
 ```
 
