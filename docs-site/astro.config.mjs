@@ -9,7 +9,7 @@ export default defineConfig({
 	integrations: [
 		starlight({
 			title: 'Credentio Contributions',
-			description: 'Idiomatic Python, Go, and Swift bindings for Google Credentio C2PA Content Credentials validator',
+			description: 'High-performance Python, Go, Swift, WebAssembly, and Agent Plugin bindings for Google Credentio C2PA Content Credentials validator',
 			plugins: [
 				catppuccin({
 					dark: { flavor: 'mocha', accent: 'sky' },
@@ -21,6 +21,11 @@ export default defineConfig({
 					icon: 'github',
 					label: 'Credentio Contributions on GitHub',
 					href: 'https://github.com/ghchinoy/credentio-contributions',
+				},
+				{
+					icon: 'rocket',
+					label: 'Live WebAssembly Validator',
+					href: 'https://credentio-validator.web.app/',
 				},
 				{
 					icon: 'external',

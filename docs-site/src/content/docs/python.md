@@ -7,7 +7,28 @@ The `credentio` Python package provides typed, in-process C2PA verification powe
 
 ---
 
-## 1. The `Validator` Class
+## 1. Installation
+
+### Prebuilt Binary Wheels (macOS arm64 & Linux x86_64)
+Pre-compiled wheels with bundled `libcredentio_c` native libraries are attached to [GitHub Releases](https://github.com/ghchinoy/credentio-contributions/releases/tag/v0.1.9):
+
+```bash
+# Example (macOS Apple Silicon, Python 3.11):
+pip install https://github.com/ghchinoy/credentio-contributions/releases/download/v0.1.9/credentio-0.1.9-cp311-cp311-macosx_11_0_arm64.whl
+
+# Example (Linux x86_64, Python 3.11):
+pip install https://github.com/ghchinoy/credentio-contributions/releases/download/v0.1.9/credentio-0.1.9-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
+```
+
+### Build from Source (Editable Mode)
+```bash
+make fetch-lib       # or: make build-lib
+make python-install
+```
+
+---
+
+## 2. The `Validator` Class
 
 ### `Validator(...)`
 Initializes a new native validator instance. Instances can be reused across thousands of validation requests for maximum throughput.
@@ -58,7 +79,7 @@ with Validator() as v:
 
 ---
 
-## 2. Data Models & Return Types
+## 3. Data Models & Return Types
 
 Validation methods return a `ProvenanceReport` dataclass:
 
@@ -126,7 +147,7 @@ class ValidationStatus:
 
 ---
 
-## 3. Error Handling
+## 4. Error Handling
 
 - **`CredentioLibraryNotFoundError`:** Raised on initial load if `libcredentio_c` shared library cannot be located.
 - **`CredentioError`:** Raised if the native validator fails unrecoverably or is used after being closed.

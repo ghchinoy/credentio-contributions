@@ -3,8 +3,6 @@ title: Agent Plugin & Skill (c2pa-inspector)
 description: Audit single media assets, batches, and directories for C2PA Content Credentials and AI provenance using autonomous Agent Plugins.
 ---
 
-# Agent Plugin: C2PA Inspector (`c2pa-inspector`)
-
 An [Agent Plugins v1.0.0](https://github.com/agentplugins/agent-plugins-spec) specification package and [Agent Skill](https://agentskills.io/specification.md) providing autonomous C2PA Content Credentials inspection, verification, and batch auditing capabilities for AI agents and developers.
 
 > **Disclaimer:** This project is an open-source community contribution and is not an officially supported Google product.

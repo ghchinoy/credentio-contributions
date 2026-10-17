@@ -3,7 +3,7 @@ title: C-ABI Architecture
 description: Deep dive into the FFI bridge, memory management, and monolithic shared library compilation.
 ---
 
-Google Credentio is authored in C++20. To provide seamless bindings for Python and Go without binding directly to C++ standard library templates, Protocol Buffers, or Abseil data structures, this project implements an intermediate `extern "C"` Application Binary Interface (C-ABI).
+Google Credentio is authored in C++20. To provide seamless bindings for Python, Go, Swift, and WebAssembly without binding directly to C++ standard library templates, Protocol Buffers, or Abseil data structures, this project implements an intermediate `extern "C"` Application Binary Interface (C-ABI).
 
 ---
 
@@ -63,9 +63,12 @@ const auto end_time = std::chrono::high_resolution_clock::now();
 
 const std::chrono::duration<double> diff = end_time - start_time;
 v->last_internal_seconds = diff.count();
+
+absl::StatusOr<nlohmann::json> crjson =
+    credentio::ConvertToCrJson(*validation_result);
 ```
 
-This isolates the raw C++ cryptographic validation time from file I/O, Python/Go runtime overhead, and garbage collection pauses.
+Because `credentio::ValidationResult` retains the extracted `manifest_store_bytes()` directly during `Validate()`, `ConvertToCrJson(*validation_result)` serializes the crJSON payload in a single pass without re-seeking or re-parsing the asset stream. This isolates raw C++ cryptographic validation time from file I/O, language runtime overhead, and garbage collection pauses.
 
 ---
 
@@ -80,6 +83,7 @@ To ensure resilience, the C-ABI layer and language bindings inspect the leading 
 - `52 49 46 46 .... 57 45 42 50` (`RIFF...WEBP`) $\to$ `image/webp`
 - `FF D8 FF` $\to$ `image/jpeg`
 - `89 50 4E 47` $\to$ `image/png`
+- `47 49 46 38` (`GIF87a` / `GIF89a`) $\to$ `image/gif`
 - `25 50 44 46` $\to$ `application/pdf`
 - `.... 66 74 79 70` (`ftyp`) $\to$ `video/mp4`, `audio/mp4`, `image/heic`, `image/avif`
 
