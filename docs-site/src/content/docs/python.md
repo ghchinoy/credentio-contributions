@@ -152,3 +152,34 @@ class ValidationStatus:
 - **`CredentioLibraryNotFoundError`:** Raised on initial load if `libcredentio_c` shared library cannot be located.
 - **`CredentioError`:** Raised if the native validator fails unrecoverably or is used after being closed.
 - **`FileNotFoundError`:** Raised if the provided file path does not exist on disk.
+
+---
+
+## 5. In-Process C2PA Signing (`Signer`)
+
+Embed and sign C2PA Content Credentials into files (`sign_file`) or in-memory byte buffers (`sign_bytes`):
+
+```python
+from credentio import Signer, Validator
+
+with Signer(
+    claim_signer_key_pem=key_pem,
+    claim_signer_cert_pem=cert_pem,
+    generator_name="MyPythonPipeline",
+    generator_version="1.0.0",
+) as signer:
+    # Sign a file on disk:
+    result = signer.sign_file(
+        "input.png",
+        "signed.png",
+        digital_source_type="http://cv.iptc.org/newscodes/digitalsourcetype/digitalCapture",
+        custom_assertions={
+            "c2pa.training-mining": {
+                "entries": {
+                    "c2pa.ai_generative_training": {"use": "notAllowed"}
+                }
+            }
+        },
+    )
+    print(f"Signed {result.byte_size} bytes in {result.core_seconds * 1000:.2f} ms")
+```

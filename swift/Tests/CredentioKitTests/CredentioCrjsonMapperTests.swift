@@ -355,4 +355,74 @@ final class CredentioCrjsonMapperTests: XCTestCase {
         // Verify signature issuer
         XCTAssertEqual(active.signature?.issuer, "TESTING Google C2PA Qual Media Services ICA G1")
     }
+
+    func testNativeSignAndValidateRoundTrip() async throws {
+        guard CredentioNativeEngine.isAvailable else {
+            throw XCTSkip("CredentioC native framework not available")
+        }
+
+        let claimSignerKeyPEM = """
+        -----BEGIN PRIVATE KEY-----
+        MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgP1t9Nc4kMdAQMHs5
+        DjHjrBFHRIOC24W+tvrPF3gS1JWhRANCAAQ+mATlGlQUDF4bGnJvbd5ehII2+Hnu
+        r+O6rqzDEiG+yWvazpNchCzDXds0DQAe7nsq1Jbd6qbZaab4eJMYakbO
+        -----END PRIVATE KEY-----
+        """
+
+        let claimSignerCertPEM = """
+        -----BEGIN CERTIFICATE-----
+        MIIB7jCCAZSgAwIBAgIQNX8XBvVYTVppX0cFOnohFzAKBggqhkjOPQQDAjA6MRcw
+        FQYDVQQKEw5DcmVkZW50aW8gVGVzdDEfMB0GA1UEAxMWQ3JlZGVudGlvIFRlc3Qg
+        Um9vdCBDQTAeFw0yNjEwMTcxODI0NTRaFw0yNzEwMTcxODI0NTRaMD8xFzAVBgNV
+        BAoTDkNyZWRlbnRpbyBUZXN0MSQwIgYDVQQDExtDcmVkZW50aW8gVGVzdCBDbGFp
+        bSBTaWduZXIwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAAQ+mATlGlQUDF4bGnJv
+        bd5ehII2+Hnur+O6rqzDEiG+yWvazpNchCzDXds0DQAe7nsq1Jbd6qbZaab4eJMY
+        akbOo3cwdTAOBgNVHQ8BAf8EBAMCB4AwFQYDVR0lBA4wDAYKKwYBBAGD6F4CATAM
+        BgNVHRMBAf8EAjAAMB0GA1UdDgQWBBQFXmMIouQm0lMTvkeJO2iPSyhm2jAfBgNV
+        HSMEGDAWgBSXI/fOmvyeRDvJE0mnuXPhzwfY6jAKBggqhkjOPQQDAgNIADBFAiEA
+        1QoxfwjNbRyWPhypgSxLFkwhUAeqSDNPybpo8+hnVMECIA+pv4x+d0Yey3G2xbg5
+        qUlmi2S1eV8f19ACqbGCN0er
+        -----END CERTIFICATE-----
+        """
+
+        let minimalPNGBytes: [UInt8] = [
+            0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
+            0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
+            0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+            0x08, 0x02, 0x00, 0x00, 0x00, 0x90, 0x77, 0x53, 0xDE,
+            0x00, 0x00, 0x00, 0x0C, 0x49, 0x44, 0x41, 0x54,
+            0x78, 0x9C, 0x63, 0xF8, 0xCF, 0xC0, 0x00, 0x00,
+            0x03, 0x01, 0x01, 0x00, 0x18, 0xDD, 0x8D, 0xB0,
+            0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44,
+            0xAE, 0x42, 0x60, 0x82
+        ]
+
+        let signer = try CredentioSigner(
+            claimSignerKeyPEM: claimSignerKeyPEM,
+            claimSignerCertPEM: claimSignerCertPEM,
+            generatorName: "SwiftCredentioSigner",
+            generatorVersion: "0.2.0"
+        )
+
+        let signRes = try await signer.sign(
+            data: Data(minimalPNGBytes),
+            mediaType: "image/png",
+            digitalSourceType: "http://cv.iptc.org/newscodes/digitalsourcetype/digitalCapture"
+        )
+        guard let signedData = signRes.signedData else {
+            XCTFail("Expected signedData to be present")
+            return
+        }
+        XCTAssertGreaterThan(signedData.count, minimalPNGBytes.count)
+
+        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("swift_signed_\(UUID().uuidString).png")
+        defer { try? FileManager.default.removeItem(at: tempURL) }
+        try signedData.write(to: tempURL)
+
+        let engine = CredentioNativeEngine(skipTrustChecks: true)
+        let report = try await engine.read(url: tempURL)
+        XCTAssertTrue(report.hasCredentials)
+        XCTAssertEqual(report.badge, .signed)
+        XCTAssertTrue((report.activeManifest?.claimGenerator ?? "").contains("SwiftCredentioSigner"))
+    }
 }

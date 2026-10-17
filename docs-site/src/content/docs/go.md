@@ -145,3 +145,41 @@ report, err := credentio.ParseCrJSON(rawJSONString, "image/jpeg", 0.0, 0.0)
 ```
 
 The parser accommodates both standard C2PA manifests and Google C2PA Core Toolkit payloads (including `claim.v2`, structured `certificateInfo`, `timeStampInfo`, and categorized `validationResults`).
+
+---
+
+## 5. In-Process C2PA Signing (`Signer` & `GenerateTestPKI`)
+
+Embed and sign C2PA Content Credentials directly into media assets (JPEG, PNG, GIF, WebP, TIFF, WAV, MP3, FLAC, MP4/MOV/HEIC/AVIF, PDF, and OOXML documents):
+
+```go
+// 1. Load your EC P-256 PKCS#8 private key and certificate chain (or generate a local test PKI)
+pki, err := credentio.GenerateTestPKI("My Organization")
+if err != nil {
+	log.Fatal(err)
+}
+
+// 2. Initialize a reusable native Signer
+signer, err := credentio.NewSigner(
+	pki.ClaimSignerKeyPEM,
+	pki.ClaimSignerCertPEM,
+	credentio.WithTSACredentials(pki.TSAKeyPEM, pki.TSACertPEM),
+	credentio.WithGeneratorInfo("MyGoApp", "1.0.0"),
+)
+if err != nil {
+	log.Fatal(err)
+}
+defer signer.Close()
+
+// 3. Sign a file on disk (or use signer.SignBytes for in-memory buffers)
+res, err := signer.SignFile("input.png", "signed.png", &credentio.SignParams{
+	DigitalSourceType: credentio.DigitalSourceTypeDigitalCapture,
+	CustomAssertions: map[string]any{
+		"c2pa.training-mining": map[string]any{
+			"entries": map[string]any{
+				"c2pa.ai_generative_training": map[string]any{"use": "notAllowed"},
+			},
+		},
+	},
+})
+```

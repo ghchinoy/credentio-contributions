@@ -65,21 +65,46 @@ echo "=== Building Google Credentio WebAssembly Engine ==="
 # Function to execute direct Bazel compilation
 run_direct_build() {
   local output_dir="$1"
-  local work_dir
-  work_dir="$(mktemp -d /tmp/credentio-wasm-build.XXXXXX)"
+  local credentio_dir=""
+  local temp_clone=""
 
-  echo "==> [Direct] Cloning Google Credentio (${CREDENTIO_SHA:0:7})..."
-  git clone "${CREDENTIO_GIT_URL}" "${work_dir}/credentio"
+  for candidate in \
+    "${CREDENTIO_DIR:-}" \
+    "${HOME}/projects/credentio" \
+    "${REPO_DIR}/../credentio" \
+    "/workspace/credentio"; do
+    if [[ -n "${candidate}" && -d "${candidate}" && -f "${candidate}/MODULE.bazel" ]]; then
+      credentio_dir="${candidate}"
+      break
+    fi
+  done
+
+  if [[ -z "${credentio_dir}" ]]; then
+    temp_clone="$(mktemp -d /tmp/credentio-wasm-build.XXXXXX)"
+    echo "==> [Direct] Cloning Google Credentio (${CREDENTIO_SHA:0:7})..."
+    git clone "${CREDENTIO_GIT_URL}" "${temp_clone}/credentio"
+    (cd "${temp_clone}/credentio" && git checkout "${CREDENTIO_SHA}")
+    credentio_dir="${temp_clone}/credentio"
+  else
+    echo "==> [Direct] Using local Google Credentio at ${credentio_dir}..."
+  fi
+
+  local orig_module
+  local unpacked_dir
+  orig_module="$(mktemp /tmp/credentio-module-bazel.XXXXXX)"
+  unpacked_dir="$(mktemp -d /tmp/credentio-wasm-unpacked.XXXXXX)"
+  cp -f "${credentio_dir}/MODULE.bazel" "${orig_module}"
+
   (
-    cd "${work_dir}/credentio"
-    git checkout "${CREDENTIO_SHA}"
-
-    echo "==> [Direct] Configuring emsdk Bazel toolchain..."
-    echo 'bazel_dep(name = "emsdk", version = "6.0.8")' >> MODULE.bazel
+    cd "${credentio_dir}"
+    if ! grep -q 'name = "emsdk"' MODULE.bazel; then
+      echo "==> [Direct] Configuring emsdk Bazel toolchain..."
+      echo 'bazel_dep(name = "emsdk", version = "6.0.8")' >> MODULE.bazel
+    fi
 
     mkdir -p bindings_c
-    cp "${REPO_DIR}/native/credentio_c.h" bindings_c/
-    cp "${REPO_DIR}/native/credentio_c.cc" bindings_c/
+    cp -f "${REPO_DIR}/native/credentio_c.h" bindings_c/
+    cp -f "${REPO_DIR}/native/credentio_c.cc" bindings_c/
 
     cat << 'BAZEL_EOF' > bindings_c/BUILD
 load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
@@ -92,8 +117,28 @@ cc_library(
     hdrs = ["credentio_c.h"],
     copts = ["-std=c++20"],
     deps = [
+        "//claim:local_signer",
         "//crypto:crypto_read_handler",
+        "//crypto:crypto_write_handler",
+        "//crypto:hash",
+        "//crypto:templated_crypto_write_handler",
         "//crypto/default:default_crypto_read_handler",
+        "//crypto/default:hasher",
+        "//crypto/default:pem",
+        "//formats/bmff:writer",
+        "//formats/gif:writer",
+        "//formats/id3:writer",
+        "//formats/jpeg:writer",
+        "//formats/pdf:writer",
+        "//formats/png:writer",
+        "//formats/riff:writer",
+        "//formats/tiff:writer",
+        "//formats/zip:writer",
+        "//generator",
+        "//generator:generator_factory",
+        "//generator:generator_options",
+        "//proto:generator_cc_proto",
+        "//testing:local_key_crypto_write_handler",
         "//utils:crjson",
         "//utils:media_type",
         "//validator:asset_validator_impl",
@@ -104,7 +149,11 @@ cc_library(
         "@abseil-cpp//absl/strings",
         "@nlohmann_json//:json",
         "@riegeli//riegeli/bytes:cfile_reader",
+        "@riegeli//riegeli/bytes:cfile_writer",
+        "@riegeli//riegeli/bytes:reader",
         "@riegeli//riegeli/bytes:string_reader",
+        "@riegeli//riegeli/bytes:string_writer",
+        "@riegeli//riegeli/bytes:writer",
     ],
     alwayslink = True,
 )
@@ -125,7 +174,7 @@ cc_binary(
         "-sSTACK_SIZE=5242880",
         "-sFORCE_FILESYSTEM=1",
         "-sENVIRONMENT=web,webview,worker,node",
-        "-sEXPORTED_FUNCTIONS=['_cr_validator_create','_cr_validator_free','_cr_validate_file','_cr_validate_bytes','_cr_last_error','_cr_last_internal_seconds','_cr_string_free','_cr_version','_malloc','_free']",
+        "-sEXPORTED_FUNCTIONS=['_cr_validator_create','_cr_validator_free','_cr_validate_file','_cr_validate_bytes','_cr_last_error','_cr_last_internal_seconds','_cr_signer_create','_cr_signer_free','_cr_sign_file','_cr_sign_bytes','_cr_signer_last_error','_cr_signer_last_internal_seconds','_cr_string_free','_cr_bytes_free','_cr_version','_malloc','_free']",
         "-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap','stringToUTF8','UTF8ToString','lengthBytesUTF8','getValue','setValue','FS','HEAPU8','HEAP8','HEAP32']",
     ],
 )
@@ -135,14 +184,23 @@ BAZEL_EOF
     bazel build --platforms=@emsdk//:platform_wasm --cxxopt="-std=c++20" //bindings_c:credentio.js
 
     echo "==> [Direct] Extracting WebAssembly bundle..."
-    mkdir -p "${work_dir}/unpacked"
-    tar -xf bazel-bin/bindings_c/credentio.js -C "${work_dir}/unpacked"
+    tar -xf bazel-bin/bindings_c/credentio.js -C "${unpacked_dir}"
 
-    cp "${work_dir}/unpacked/credentio.js" "${output_dir}/credentio.js"
-    cp "${work_dir}/unpacked/credentio.wasm" "${output_dir}/credentio.wasm"
+    cp -f "${unpacked_dir}/credentio.js" "${output_dir}/credentio.js"
+    cp -f "${unpacked_dir}/credentio.wasm" "${output_dir}/credentio.wasm"
     chmod 644 "${output_dir}"/credentio.*
-  )
-  rm -rf "${work_dir}"
+  ) || {
+    cp -f "${orig_module}" "${credentio_dir}/MODULE.bazel"
+    cp -f "${REPO_DIR}/native/BUILD" "${credentio_dir}/bindings_c/BUILD" 2>/dev/null || true
+    rm -rf "${orig_module}" "${unpacked_dir}"
+    if [[ -n "${temp_clone}" ]]; then rm -rf "${temp_clone}"; fi
+    return 1
+  }
+
+  cp -f "${orig_module}" "${credentio_dir}/MODULE.bazel"
+  cp -f "${REPO_DIR}/native/BUILD" "${credentio_dir}/bindings_c/BUILD" 2>/dev/null || true
+  rm -rf "${orig_module}" "${unpacked_dir}"
+  if [[ -n "${temp_clone}" ]]; then rm -rf "${temp_clone}"; fi
 }
 
 STAGE_HOST_DIR="$(mktemp -d /tmp/credentio-wasm-stage.XXXXXX)"
@@ -229,8 +287,28 @@ cc_library(
     hdrs = [\"credentio_c.h\"],
     copts = [\"-std=c++20\"],
     deps = [
+        \"//claim:local_signer\",
         \"//crypto:crypto_read_handler\",
+        \"//crypto:crypto_write_handler\",
+        \"//crypto:hash\",
+        \"//crypto:templated_crypto_write_handler\",
         \"//crypto/default:default_crypto_read_handler\",
+        \"//crypto/default:hasher\",
+        \"//crypto/default:pem\",
+        \"//formats/bmff:writer\",
+        \"//formats/gif:writer\",
+        \"//formats/id3:writer\",
+        \"//formats/jpeg:writer\",
+        \"//formats/pdf:writer\",
+        \"//formats/png:writer\",
+        \"//formats/riff:writer\",
+        \"//formats/tiff:writer\",
+        \"//formats/zip:writer\",
+        \"//generator\",
+        \"//generator:generator_factory\",
+        \"//generator:generator_options\",
+        \"//proto:generator_cc_proto\",
+        \"//testing:local_key_crypto_write_handler\",
         \"//utils:crjson\",
         \"//utils:media_type\",
         \"//validator:asset_validator_impl\",
@@ -241,7 +319,11 @@ cc_library(
         \"@abseil-cpp//absl/strings\",
         \"@nlohmann_json//:json\",
         \"@riegeli//riegeli/bytes:cfile_reader\",
+        \"@riegeli//riegeli/bytes:cfile_writer\",
+        \"@riegeli//riegeli/bytes:reader\",
         \"@riegeli//riegeli/bytes:string_reader\",
+        \"@riegeli//riegeli/bytes:string_writer\",
+        \"@riegeli//riegeli/bytes:writer\",
     ],
     alwayslink = True,
 )
@@ -262,7 +344,7 @@ cc_binary(
         \"-sSTACK_SIZE=5242880\",
         \"-sFORCE_FILESYSTEM=1\",
         \"-sENVIRONMENT=web,webview,worker,node\",
-        \"-sEXPORTED_FUNCTIONS=['_cr_validator_create','_cr_validator_free','_cr_validate_file','_cr_validate_bytes','_cr_last_error','_cr_last_internal_seconds','_cr_string_free','_cr_version','_malloc','_free']\",
+        \"-sEXPORTED_FUNCTIONS=['_cr_validator_create','_cr_validator_free','_cr_validate_file','_cr_validate_bytes','_cr_last_error','_cr_last_internal_seconds','_cr_signer_create','_cr_signer_free','_cr_sign_file','_cr_sign_bytes','_cr_signer_last_error','_cr_signer_last_internal_seconds','_cr_string_free','_cr_bytes_free','_cr_version','_malloc','_free']\",
         \"-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap','stringToUTF8','UTF8ToString','lengthBytesUTF8','getValue','setValue','FS','HEAPU8','HEAP8','HEAP32']\",
     ],
 )

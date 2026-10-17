@@ -42,6 +42,7 @@ export default defineConfig({
 						{ label: 'C2PA Core Concepts', slug: 'concepts' },
 						{ label: 'Trust Anchors & Validity', slug: 'trust' },
 						{ label: 'Quick Start', slug: 'getting-started' },
+						{ label: 'Use Cases & Project Ideas', slug: 'use-cases' },
 					],
 				},
 				{

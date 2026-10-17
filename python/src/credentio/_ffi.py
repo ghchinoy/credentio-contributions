@@ -27,8 +27,10 @@ C_HEADER = """
 #define CR_STATUS_INVALID_ARGUMENT 2
 #define CR_STATUS_IO_ERROR 3
 #define CR_STATUS_INTERNAL_ERROR 4
+#define CR_STATUS_UNSUPPORTED_FORMAT 5
 
 typedef struct cr_validator cr_validator;
+typedef struct cr_signer cr_signer;
 
 cr_validator* cr_validator_create(
     const char* claim_signer_trust_pem,
@@ -52,7 +54,40 @@ char* cr_validate_bytes(
 
 const char* cr_last_error(cr_validator* validator);
 double cr_last_internal_seconds(cr_validator* validator);
+
+cr_signer* cr_signer_create(
+    const char* claim_signer_key_pem,
+    const char* claim_signer_cert_pem,
+    const char* tsa_key_pem,
+    const char* tsa_cert_pem,
+    const char* generator_name,
+    const char* generator_version);
+
+void cr_signer_free(cr_signer* signer);
+
+int cr_sign_file(
+    cr_signer* signer,
+    const char* input_path,
+    const char* output_path,
+    const char* media_type,
+    const char* digital_source_type,
+    const char* custom_assertions_json);
+
+uint8_t* cr_sign_bytes(
+    cr_signer* signer,
+    const uint8_t* bytes,
+    size_t count,
+    const char* media_type,
+    const char* digital_source_type,
+    const char* custom_assertions_json,
+    size_t* out_size,
+    int* out_status);
+
+const char* cr_signer_last_error(cr_signer* signer);
+double cr_signer_last_internal_seconds(cr_signer* signer);
+
 void cr_string_free(char* str);
+void cr_bytes_free(uint8_t* bytes);
 const char* cr_version(void);
 """
 

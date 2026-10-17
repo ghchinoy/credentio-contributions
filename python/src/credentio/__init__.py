@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Python bindings for Google Credentio C2PA Content Credentials validator."""
+"""Python bindings for Google Credentio C2PA Content Credentials validator & signer."""
 
 from .models import (
     Assertion,
@@ -25,9 +25,10 @@ from .models import (
     ValidationStatus,
     parse_crjson,
 )
+from .signer import SignResult, Signer
 from .validator import CredentioError, Validator
 
-__version__ = "0.1.9"
+__version__ = "0.2.0"
 
 __all__ = [
     "Assertion",
@@ -37,9 +38,10 @@ __all__ = [
     "Manifest",
     "ProvenanceReport",
     "Severity",
+    "SignResult",
     "SignatureInfo",
+    "Signer",
     "ValidationStatus",
     "Validator",
     "parse_crjson",
-    "__version__",
 ]

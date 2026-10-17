@@ -234,4 +234,97 @@ def test_sniff_media_type():
     assert sniff_media_type(b"\x00\x00\x00\x18ftypmp42\x00\x00\x00\x00") == "video/mp4"
 
 
+TEST_CLAIM_SIGNER_KEY_PEM = """-----BEGIN PRIVATE KEY-----
+MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgP1t9Nc4kMdAQMHs5
+DjHjrBFHRIOC24W+tvrPF3gS1JWhRANCAAQ+mATlGlQUDF4bGnJvbd5ehII2+Hnu
+r+O6rqzDEiG+yWvazpNchCzDXds0DQAe7nsq1Jbd6qbZaab4eJMYakbO
+-----END PRIVATE KEY-----
+"""
+
+TEST_CLAIM_SIGNER_CERT_PEM = """-----BEGIN CERTIFICATE-----
+MIIB7jCCAZSgAwIBAgIQNX8XBvVYTVppX0cFOnohFzAKBggqhkjOPQQDAjA6MRcw
+FQYDVQQKEw5DcmVkZW50aW8gVGVzdDEfMB0GA1UEAxMWQ3JlZGVudGlvIFRlc3Qg
+Um9vdCBDQTAeFw0yNjEwMTcxODI0NTRaFw0yNzEwMTcxODI0NTRaMD8xFzAVBgNV
+BAoTDkNyZWRlbnRpbyBUZXN0MSQwIgYDVQQDExtDcmVkZW50aW8gVGVzdCBDbGFp
+bSBTaWduZXIwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAAQ+mATlGlQUDF4bGnJv
+bd5ehII2+Hnur+O6rqzDEiG+yWvazpNchCzDXds0DQAe7nsq1Jbd6qbZaab4eJMY
+akbOo3cwdTAOBgNVHQ8BAf8EBAMCB4AwFQYDVR0lBA4wDAYKKwYBBAGD6F4CATAM
+BgNVHRMBAf8EAjAAMB0GA1UdDgQWBBQFXmMIouQm0lMTvkeJO2iPSyhm2jAfBgNV
+HSMEGDAWgBSXI/fOmvyeRDvJE0mnuXPhzwfY6jAKBggqhkjOPQQDAgNIADBFAiEA
+1QoxfwjNbRyWPhypgSxLFkwhUAeqSDNPybpo8+hnVMECIA+pv4x+d0Yey3G2xbg5
+qUlmi2S1eV8f19ACqbGCN0er
+-----END CERTIFICATE-----
+"""
+
+TEST_ROOT_CA_CERT_PEM = """-----BEGIN CERTIFICATE-----
+MIIBtTCCAVugAwIBAgIRAIB04rVlhoVgFjG20uDN2oMwCgYIKoZIzj0EAwIwOjEX
+MBUGA1UEChMOQ3JlZGVudGlvIFRlc3QxHzAdBgNVBAMTFkNyZWRlbnRpbyBUZXN0
+IFJvb3QgQ0EwHhcNMjYxMDE3MTgyNDU0WhcNMzYxMDE0MTgyNDU0WjA6MRcwFQYD
+VQQKEw5DcmVkZW50aW8gVGVzdDEfMB0GA1UEAxMWQ3JlZGVudGlvIFRlc3QgUm9v
+dCBDQTBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABOwYL78IKaNH3kHfkUbiJ14I
+CE+Oqt2d5Ff+cRdEWdjIC4anDZV59g1l1xPbR64Vekz92haftrPF5ASYbiFFPKOj
+QjBAMA4GA1UdDwEB/wQEAwIBBjAPBgNVHRMBAf8EBTADAQH/MB0GA1UdDgQWBBSX
+I/fOmvyeRDvJE0mnuXPhzwfY6jAKBggqhkjOPQQDAgNIADBFAiAs080K/Oc04cxa
+OztvtOkuwBWBhpirSO33aypvsMndPgIhAKglQdIKHp8leqLhEW5CYYZzETU0mZLc
+OQuIj7JcTfYt
+-----END CERTIFICATE-----
+"""
+
+# Minimal valid 1x1 RGB PNG image
+MINIMAL_PNG_BYTES = (
+    b"\x89PNG\r\n\x1a\n"
+    b"\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde"
+    b"\x00\x00\x00\x0cIDATx\x9cc\xf8\xcf\xc0\x00\x00\x03\x01\x01\x00\x18\xdd\x8d\xb0"
+    b"\x00\x00\x00\x00IEND\xaeB`\x82"
+)
+
+
+@pytest.mark.skipif(_find_library_path() is None, reason="Native libcredentio_c shared library not built yet")
+def test_sign_and_validate_round_trip(tmp_path):
+    from credentio import Signer, Validator
+
+    with Signer(
+        claim_signer_key_pem=TEST_CLAIM_SIGNER_KEY_PEM,
+        claim_signer_cert_pem=TEST_CLAIM_SIGNER_CERT_PEM,
+        generator_name="PythonCredentioSigner",
+        generator_version="0.2.0",
+    ) as signer:
+        res = signer.sign_bytes(
+            MINIMAL_PNG_BYTES,
+            media_type="image/png",
+            digital_source_type="http://cv.iptc.org/newscodes/digitalsourcetype/digitalCapture",
+            custom_assertions={
+                "c2pa.training-mining": {
+                    "entries": {
+                        "c2pa.ai_generative_training": {"use": "notAllowed"}
+                    }
+                }
+            },
+        )
+        assert res.signed_bytes is not None
+        assert res.byte_size > len(MINIMAL_PNG_BYTES)
+
+        # Also test file-to-file signing
+        in_file = tmp_path / "source.png"
+        out_file = tmp_path / "signed.png"
+        in_file.write_bytes(MINIMAL_PNG_BYTES)
+        file_res = signer.sign_file(in_file, out_file)
+        assert file_res.byte_size > len(MINIMAL_PNG_BYTES)
+
+    with Validator(
+        claim_signer_trust_pem=TEST_ROOT_CA_CERT_PEM,
+        skip_trust_checks=True,
+    ) as validator:
+        report = validator.validate_bytes(res.signed_bytes, media_type="image/png")
+        assert report.has_credentials is True
+        assert report.badge == BadgeState.SIGNED
+        assert report.active_manifest is not None
+        assert "PythonCredentioSigner" in (report.active_manifest.claim_generator or "")
+
+        file_report = validator.validate_file(out_file)
+        assert file_report.has_credentials is True
+        assert file_report.badge == BadgeState.SIGNED
+
+
+
 

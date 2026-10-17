@@ -21,7 +21,9 @@ from typing import Optional
 
 from . import __version__
 from .models import BadgeState, ProvenanceReport
+from .signer import Signer
 from .validator import CredentioError, Validator
+
 
 def format_human_output(report: ProvenanceReport, file_path: Path) -> str:
     size_mb = os.path.getsize(file_path) / (1024.0 * 1024.0)
@@ -37,9 +39,9 @@ def format_human_output(report: ProvenanceReport, file_path: Path) -> str:
     if report.has_credentials and report.active_manifest:
         m = report.active_manifest
         lines.extend([
-            f"Generator:   {m.claim_generator or '—'}",
-            f"Issuer:      {m.signature.issuer if m.signature else '—'}",
-            f"Format/Spec: {m.format or '—'} (C2PA {report.spec_version or '—'})",
+            f"Generator:   {m.claim_generator or '-'}",
+            f"Issuer:      {m.signature.issuer if m.signature else '-'}",
+            f"Format/Spec: {m.format or '-'} (C2PA {report.spec_version or '-'})",
             f"Assertions:  {len(m.assertions)} attached",
             f"Statuses:    {len(m.validation_statuses)} reported",
         ])
@@ -85,7 +87,7 @@ def format_json_output(report: ProvenanceReport, file_path: Path) -> str:
 def main(args: Optional[list] = None) -> int:
     parser = argparse.ArgumentParser(
         prog="credentio",
-        description="Google Credentio C2PA Content Credentials Command-Line Validator"
+        description="Google Credentio C2PA Content Credentials Command-Line Validator & Signer"
     )
     parser.add_argument("--version", "-v", action="version", version=f"%(prog)s {__version__}")
 
@@ -99,6 +101,19 @@ def main(args: Optional[list] = None) -> int:
     val_parser.add_argument("--claim-signer-trust", type=Path, default=None, help="Path to claim signer trust anchors PEM")
     val_parser.add_argument("--tsa-trust", type=Path, default=None, help="Path to TSA trust anchors PEM")
     val_parser.add_argument("--skip-trust-checks", action="store_true", default=True, help="Skip trust anchor checks (default: True)")
+
+    # sign subcommand
+    sign_parser = subparsers.add_parser("sign", help="Embed and sign C2PA content credentials into a media file")
+    sign_parser.add_argument("input", type=Path, help="Path to input media asset")
+    sign_parser.add_argument("--output", "-o", type=Path, required=True, help="Path to output signed asset")
+    sign_parser.add_argument("--key", type=Path, required=True, help="Path to claim signer EC P-256 private key PEM")
+    sign_parser.add_argument("--cert", type=Path, required=True, help="Path to claim signer X.509 certificate chain PEM")
+    sign_parser.add_argument("--tsa-key", type=Path, default=None, help="Optional path to TSA EC P-256 private key PEM")
+    sign_parser.add_argument("--tsa-cert", type=Path, default=None, help="Optional path to TSA X.509 certificate PEM")
+    sign_parser.add_argument("--media-type", "-m", type=str, default=None, help="Optional IANA media type")
+    sign_parser.add_argument("--source-type", type=str, default=None, help="Optional IPTC digitalSourceType URI")
+    sign_parser.add_argument("--generator", type=str, default="Credentio Python CLI", help="Claim generator name")
+    sign_parser.add_argument("--json", action="store_true", help="Output structured JSON")
 
     parsed = parser.parse_args(args)
 
@@ -136,6 +151,50 @@ def main(args: Optional[list] = None) -> int:
             return 1
         elif report.badge == BadgeState.INVALID:
             return 2
+        return 0
+
+    if parsed.subcommand == "sign":
+        if not parsed.input.is_file():
+            print(f"Error: input file not found at {parsed.input}", file=sys.stderr)
+            return 3
+
+        try:
+            key_pem = parsed.key.read_text("utf-8")
+            cert_pem = parsed.cert.read_text("utf-8")
+            tsa_key_pem = parsed.tsa_key.read_text("utf-8") if parsed.tsa_key else None
+            tsa_cert_pem = parsed.tsa_cert.read_text("utf-8") if parsed.tsa_cert else None
+
+            with Signer(
+                claim_signer_key_pem=key_pem,
+                claim_signer_cert_pem=cert_pem,
+                tsa_key_pem=tsa_key_pem,
+                tsa_cert_pem=tsa_cert_pem,
+                generator_name=parsed.generator,
+                generator_version=__version__,
+            ) as signer:
+                res = signer.sign_file(
+                    parsed.input,
+                    parsed.output,
+                    media_type=parsed.media_type,
+                    digital_source_type=parsed.source_type,
+                )
+        except Exception as e:
+            print(f"Error: {e}", file=sys.stderr)
+            return 3
+
+        if parsed.json:
+            print(json.dumps({
+                "output_path": res.output_path,
+                "byte_size": res.byte_size,
+                "media_type": res.media_type,
+                "elapsed_seconds": res.elapsed_seconds,
+                "core_seconds": res.core_seconds,
+            }, indent=2))
+        else:
+            print(
+                f"Signed C2PA asset written to {res.output_path} "
+                f"({res.byte_size} bytes, core: {res.core_seconds * 1000.0:.2f} ms)"
+            )
         return 0
 
     return 0

@@ -17,6 +17,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { loadCredentioWasm } from '../src/bridge/loader.js';
+import { CredentioSigner } from '../src/signer.js';
 import { CredentioValidator } from '../src/validator.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -76,5 +77,74 @@ describe.runIf(hasWasmBinary)('Credentio WebAssembly Native Integration Suite', 
 
     validator[Symbol.dispose]();
     expect(validator.isOpen).toBe(false);
+  });
+
+  it('signs a PNG in memory with CredentioSigner and verifies it with CredentioValidator', async () => {
+    const claimSignerKeyPem = [
+      '-----BEGIN PRIVATE KEY-----',
+      'MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgP1t9Nc4kMdAQMHs5',
+      'DjHjrBFHRIOC24W+tvrPF3gS1JWhRANCAAQ+mATlGlQUDF4bGnJvbd5ehII2+Hnu',
+      'r+O6rqzDEiG+yWvazpNchCzDXds0DQAe7nsq1Jbd6qbZaab4eJMYakbO',
+      '-----END PRIVATE KEY-----'
+    ].join('\n');
+
+    const claimSignerCertPem = [
+      '-----BEGIN CERTIFICATE-----',
+      'MIIB7jCCAZSgAwIBAgIQNX8XBvVYTVppX0cFOnohFzAKBggqhkjOPQQDAjA6MRcw',
+      'FQYDVQQKEw5DcmVkZW50aW8gVGVzdDEfMB0GA1UEAxMWQ3JlZGVudGlvIFRlc3Qg',
+      'Um9vdCBDQTAeFw0yNjEwMTcxODI0NTRaFw0yNzEwMTcxODI0NTRaMD8xFzAVBgNV',
+      'BAoTDkNyZWRlbnRpbyBUZXN0MSQwIgYDVQQDExtDcmVkZW50aW8gVGVzdCBDbGFp',
+      'bSBTaWduZXIwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAAQ+mATlGlQUDF4bGnJv',
+      'bd5ehII2+Hnur+O6rqzDEiG+yWvazpNchCzDXds0DQAe7nsq1Jbd6qbZaab4eJMY',
+      'akbOo3cwdTAOBgNVHQ8BAf8EBAMCB4AwFQYDVR0lBA4wDAYKKwYBBAGD6F4CATAM',
+      'BgNVHRMBAf8EAjAAMB0GA1UdDgQWBBQFXmMIouQm0lMTvkeJO2iPSyhm2jAfBgNV',
+      'HSMEGDAWgBSXI/fOmvyeRDvJE0mnuXPhzwfY6jAKBggqhkjOPQQDAgNIADBFAiEA',
+      '1QoxfwjNbRyWPhypgSxLFkwhUAeqSDNPybpo8+hnVMECIA+pv4x+d0Yey3G2xbg5',
+      'qUlmi2S1eV8f19ACqbGCN0er',
+      '-----END CERTIFICATE-----'
+    ].join('\n');
+
+    const minimalPng = new Uint8Array([
+      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+      0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
+      0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+      0x08, 0x02, 0x00, 0x00, 0x00, 0x90, 0x77, 0x53, 0xde,
+      0x00, 0x00, 0x00, 0x0c, 0x49, 0x44, 0x41, 0x54,
+      0x78, 0x9c, 0x63, 0xf8, 0xcf, 0xc0, 0x00, 0x00,
+      0x03, 0x01, 0x01, 0x00, 0x18, 0xdd, 0x8d, 0xb0,
+      0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44,
+      0xae, 0x42, 0x60, 0x82
+    ]);
+
+    const signer = await CredentioSigner.create({
+      claimSignerKeyPem,
+      claimSignerCertPem,
+      generatorName: 'WasmCredentioSigner',
+      generatorVersion: '0.2.0'
+    });
+    expect(signer.isOpen).toBe(true);
+
+    const signResult = await signer.signBytes(minimalPng, {
+      mediaType: 'image/png',
+      digitalSourceType: 'http://cv.iptc.org/newscodes/digitalsourcetype/digitalCapture',
+      customAssertions: {
+        'c2pa.training-mining': {
+          entries: {
+            'c2pa.ai_generative_training': { use: 'notAllowed' }
+          }
+        }
+      }
+    });
+    expect(signResult.byteSize).toBeGreaterThan(minimalPng.byteLength);
+    expect(signResult.signedBytes.byteLength).toBe(signResult.byteSize);
+    signer.close();
+    expect(signer.isOpen).toBe(false);
+
+    const validator = await CredentioValidator.create({ skipTrustChecks: true });
+    const report = await validator.validateBytes(signResult.signedBytes, 'image/png');
+    expect(report.hasCredentials).toBe(true);
+    expect(report.badge).toBe('signed');
+    expect(report.primaryClaimGenerator).toContain('WasmCredentioSigner');
+    validator.close();
   });
 });

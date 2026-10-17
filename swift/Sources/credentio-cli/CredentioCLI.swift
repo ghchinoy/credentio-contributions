@@ -20,11 +20,101 @@ import Foundation
 struct CredentioCLI: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "credentio-cli",
-        abstract: "Google Credentio C2PA Content Credentials Command-Line Validator",
-        version: "0.1.9",
-        subcommands: [Validate.self],
+        abstract: "Google Credentio C2PA Content Credentials Command-Line Validator & Signer",
+        version: "0.2.0",
+        subcommands: [Validate.self, Sign.self],
         defaultSubcommand: Validate.self
     )
+}
+
+struct Sign: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        abstract: "Embed and sign C2PA content credentials into a media asset"
+    )
+
+    @Argument(help: "Path to input media asset")
+    var input: String
+
+    @Option(name: [.short, .customLong("output")], help: "Path to output signed asset")
+    var output: String
+
+    @Option(name: .customLong("key"), help: "Path to claim signer EC P-256 private key PEM")
+    var keyPath: String
+
+    @Option(name: .customLong("cert"), help: "Path to claim signer X.509 certificate chain PEM")
+    var certPath: String
+
+    @Option(name: .customLong("tsa-key"), help: "Optional path to TSA EC P-256 private key PEM")
+    var tsaKeyPath: String?
+
+    @Option(name: .customLong("tsa-cert"), help: "Optional path to TSA X.509 certificate PEM")
+    var tsaCertPath: String?
+
+    @Option(name: [.short, .customLong("media-type")], help: "Optional IANA MIME type")
+    var mediaType: String?
+
+    @Option(name: .customLong("source-type"), help: "Optional IPTC digitalSourceType URI")
+    var sourceType: String?
+
+    @Option(name: .customLong("generator"), help: "Claim generator software name")
+    var generator: String = "CredentioKit CLI"
+
+    @Flag(name: .customLong("json"), help: "Output structured JSON")
+    var jsonOutput: Bool = false
+
+    func run() async throws {
+        let inURL = URL(fileURLWithPath: (input as NSString).expandingTildeInPath)
+        let outURL = URL(fileURLWithPath: (output as NSString).expandingTildeInPath)
+        guard FileManager.default.fileExists(atPath: inURL.path) else {
+            FileHandle.standardError.write(Data("Error: input file not found at \(inURL.path)\n".utf8))
+            throw ExitCode(3)
+        }
+
+        do {
+            let keyPEM = try String(contentsOfFile: (keyPath as NSString).expandingTildeInPath, encoding: .utf8)
+            let certPEM = try String(contentsOfFile: (certPath as NSString).expandingTildeInPath, encoding: .utf8)
+            let tsaKeyPEM = try tsaKeyPath.map { try String(contentsOfFile: ($0 as NSString).expandingTildeInPath, encoding: .utf8) }
+            let tsaCertPEM = try tsaCertPath.map { try String(contentsOfFile: ($0 as NSString).expandingTildeInPath, encoding: .utf8) }
+
+            let signer = try CredentioSigner(
+                claimSignerKeyPEM: keyPEM,
+                claimSignerCertPEM: certPEM,
+                tsaKeyPEM: tsaKeyPEM,
+                tsaCertPEM: tsaCertPEM,
+                generatorName: generator,
+                generatorVersion: "0.2.0"
+            )
+
+            let res = try await signer.sign(
+                inputURL: inURL,
+                outputURL: outURL,
+                mediaType: mediaType,
+                digitalSourceType: sourceType
+            )
+
+            let coreMs = res.engineInternalElapsed.map {
+                Double($0.components.seconds) * 1000.0 + Double($0.components.attoseconds) / 1e15
+            } ?? 0.0
+
+            if jsonOutput {
+                let dict: [String: Any] = [
+                    "output_path": outURL.path,
+                    "byte_size": res.byteSize,
+                    "media_type": res.mediaType as Any,
+                    "core_ms": coreMs
+                ]
+                if let data = try? JSONSerialization.data(withJSONObject: dict, options: [.prettyPrinted, .sortedKeys]),
+                   let str = String(data: data, encoding: .utf8) {
+                    print(str)
+                }
+            } else {
+                print(String(format: "Signed C2PA asset written to %@ (%d bytes, core: %.2f ms)", outURL.path, res.byteSize, coreMs))
+            }
+        } catch {
+            FileHandle.standardError.write(Data("Signing error: \(error.localizedDescription)\n".utf8))
+            throw ExitCode(3)
+        }
+    }
 }
 
 struct Validate: AsyncParsableCommand {

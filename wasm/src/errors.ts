@@ -25,7 +25,9 @@ export enum CredentioStatusCode {
   /** Failed to read, decode, or write asset data. */
   IO_ERROR = 3,
   /** Internal error within the C2PA validation pipeline. */
-  INTERNAL_ERROR = 4
+  INTERNAL_ERROR = 4,
+  /** Media format is not supported for the requested operation. */
+  UNSUPPORTED_FORMAT = 5
 }
 
 /**

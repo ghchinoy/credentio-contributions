@@ -1,0 +1,280 @@
+---
+title: Use Cases & Project Ideas
+description: Real-world recipes and starter architectures for building C2PA verification and signing workflows with Python, Go, Swift, WebAssembly, and AI Agents.
+---
+
+import { Card, CardGrid, Tabs, TabItem } from '@astrojs/starlight/components';
+
+Because `credentio-contributions` runs **in-process in 3 to 5 milliseconds** with zero network egress across Python, Go, Swift, WebAssembly, and AI Agents, it unlocks real-time media provenance workflows that are impractical when shelling out to CLI subprocesses or calling cloud verification APIs.
+
+Below are practical architectures and runnable starter patterns across all four ecosystems.
+
+---
+
+## 1. Browser & Edge (`@ghchinoy/credentio-wasm`)
+
+<CardGrid>
+  <Card title="Hover-to-Verify Browser Extension" icon="laptop">
+    Inspect images, audio, and video on social feeds or news articles inside a background Web Worker. Render a live **"Signed by Camera / AI Generator"** or **"Tampered Signature"** badge without sending browsing history to an external server.
+  </Card>
+  <Card title="Cloudflare Worker Upload Gatekeeper" icon="rocket">
+    Validate `request.arrayBuffer()` at the CDN edge before an upload reaches S3, R2, or Google Cloud Storage, attaching `X-C2PA-Status` and `X-C2PA-Issuer` headers for downstream services.
+  </Card>
+</CardGrid>
+
+<Tabs>
+  <TabItem label="Cloudflare Worker Gatekeeper" icon="seti:typescript">
+    ```typescript
+    import { CredentioValidator } from '@ghchinoy/credentio-wasm';
+
+    export default {
+      async fetch(request: Request, env: { MEDIA_BUCKET: R2Bucket }): Promise<Response> {
+        if (request.method !== 'PUT') {
+          return new Response('Method Not Allowed', { status: 405 });
+        }
+
+        const mediaBytes = await request.arrayBuffer();
+        using validator = await CredentioValidator.create({ skipTrustChecks: false });
+        const report = await validator.validateBytes(mediaBytes);
+
+        // Reject tampered assets at the edge before storage ingestion
+        if (report.isInvalid) {
+          return Response.json(
+            { error: 'C2PA signature verification failed', report },
+            { status: 422 }
+          );
+        }
+
+        const objectKey = new URL(request.url).pathname.slice(1);
+        await env.MEDIA_BUCKET.put(objectKey, mediaBytes, {
+          customMetadata: {
+            'c2pa-badge': report.badge,
+            'c2pa-generator': report.primaryClaimGenerator ?? 'unknown',
+            'c2pa-issuer': report.primarySignerIssuer ?? 'none',
+          },
+        });
+
+        return Response.json({
+          stored: objectKey,
+          badge: report.badge,
+          coreMs: ((report.coreSeconds ?? 0) * 1000).toFixed(2),
+        });
+      },
+    };
+    ```
+  </TabItem>
+
+  <TabItem label="Browser Extension Web Worker" icon="seti:javascript">
+    ```typescript
+    // provenance-worker.ts: Offloads C2PA inspection from the page UI thread
+    import { CredentioValidator } from '@ghchinoy/credentio-wasm';
+
+    let validatorPromise: Promise<CredentioValidator> | null = null;
+
+    self.onmessage = async (event: MessageEvent<{ id: string; url: string }>) => {
+      const { id, url } = event.data;
+
+      if (!validatorPromise) {
+        validatorPromise = CredentioValidator.create({ skipTrustChecks: true });
+      }
+
+      try {
+        const response = await fetch(url);
+        const blob = await response.blob();
+        const validator = await validatorPromise;
+        const report = await validator.validateBlob(blob);
+
+        self.postMessage({
+          id,
+          badge: report.badge,
+          generator: report.primaryClaimGenerator,
+          issuer: report.primarySignerIssuer,
+          assertions: report.activeManifest?.assertions ?? [],
+        });
+      } catch (err: unknown) {
+        self.postMessage({
+          id,
+          badge: 'error',
+          message: err instanceof Error ? err.message : String(err),
+        });
+      }
+    };
+    ```
+  </TabItem>
+</Tabs>
+
+---
+
+## 2. AI & Data Engineering (`credentio` Python + `c2pa-inspector`)
+
+<CardGrid>
+  <Card title="Ethical AI Dataset Scrubber" icon="approve-check-circle">
+    Before fine-tuning a model or indexing a dataset, scan media directories for `c2pa.ai_generative_training`, `cawg.data_mining`, and IPTC `trainedAlgorithmicMedia` assertions to honor creator opt-outs and prevent synthetic model collapse.
+  </Card>
+  <Card title="Multimodal RAG Gatekeeper" icon="document">
+    Verify PDFs, audio recordings, and images in memory (`validate_bytes()`) before chunking and embedding so untrusted or modified files receive lower provenance trust weights in your vector database.
+  </Card>
+</CardGrid>
+
+<Tabs>
+  <TabItem label="Dataset Consent Scrubber" icon="seti:python">
+    ```python
+    from pathlib import Path
+    from credentio import AssertionKind, BadgeState, Validator
+
+    def filter_training_dataset(dataset_dir: Path) -> list[Path]:
+        approved_assets: list[Path] = []
+
+        # Reuse a single native validator across the entire dataset
+        with Validator(skip_trust_checks=True) as validator:
+            for path in dataset_dir.rglob("*"):
+                if not path.is_file():
+                    continue
+
+                report = validator.validate_file(str(path))
+
+                # 1. Quarantine assets with broken cryptographic signatures
+                if report.badge == BadgeState.INVALID:
+                    print(f"[QUARANTINE] Tampered credential: {path.name}")
+                    continue
+
+                # 2. Check for AI training or data-mining opt-out assertions
+                if report.active_manifest:
+                    opt_out = any(
+                        a.kind == AssertionKind.AI_TRAINING_MINING
+                        and "notAllowed" in (a.summary or "")
+                        for a in report.active_manifest.assertions
+                    )
+                    if opt_out:
+                        print(f"[SKIP] Creator opted out of AI training: {path.name}")
+                        continue
+
+                approved_assets.append(path)
+
+        return approved_assets
+    ```
+  </TabItem>
+
+  <TabItem label="Autonomous Agent Audit" icon="puzzle">
+    ```bash
+    # Scan a directory recursively for AI-generated assets and emit JSON for agent pipelines:
+    python3 plugins/c2pa-inspector/skills/c2pa-inspect/scripts/inspect_c2pa.py \
+      --dir ./incoming-media \
+      --recursive \
+      --filter ai-only \
+      --json
+    ```
+  </TabItem>
+</Tabs>
+
+---
+
+## 3. Apple Ecosystem (`CredentioKit` Swift)
+
+<CardGrid>
+  <Card title="macOS QuickLook & Menu Bar Dropper" icon="apple">
+    Because `CredentioKit` runs in-process via a static XCFramework with zero child subprocesses, it complies with strict macOS App Sandbox rules for Finder QuickLook extensions and menu-bar utilities.
+  </Card>
+  <Card title="iOS Share Sheet Authenticity Action" icon=" mobile">
+    Inspect images or videos shared from social or messaging apps on iOS 16+ to verify whether a clip originated from a hardware-attested camera or a generative AI model.
+  </Card>
+</CardGrid>
+
+```swift
+import CredentioKit
+import SwiftUI
+
+struct ProvenanceDropView: View {
+    @State private var report: ProvenanceReport?
+    private let engine = CredentioNativeEngine(skipTrustChecks: true)
+
+    var body: some View {
+        VStack(spacing: 12) {
+            if let report {
+                Text("Verdict: \(report.badge.rawValue.uppercased())")
+                    .font(.headline)
+                Text("Generator: \(report.activeManifest?.claimGenerator ?? "None")")
+                Text("Issuer: \(report.activeManifest?.signature?.issuer ?? "Unsigned")")
+            } else {
+                Text("Drop an image, video, audio clip, or PDF to verify C2PA credentials")
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(24)
+        .dropDestination(for: URL.self) { urls, _ in
+            guard let firstURL = urls.first else { return false }
+            Task {
+                self.report = try? await engine.read(url: firstURL)
+            }
+            return true
+        }
+    }
+}
+```
+
+---
+
+## 4. Backend & DevOps (`credentio/go`)
+
+<CardGrid>
+  <Card title="Git Pre-Commit & CI Provenance Linter" icon="github">
+    Run a fast Go check in `.git/hooks/pre-commit` or GitHub Actions to ensure committed brand assets, press photos, and release PDFs carry valid C2PA signatures before merging.
+  </Card>
+  <Card title="High-Throughput HTTP/gRPC Middleware" icon="random">
+    Stream multipart uploads through a Go `credentio.Validator` and record validation latency and signer metrics to Prometheus or OpenTelemetry with sub-5ms p99 overhead.
+  </Card>
+</CardGrid>
+
+<Tabs>
+  <TabItem label="Go HTTP Upload Middleware" icon="seti:go">
+    ```go
+    package main
+
+    import (
+    	"encoding/json"
+    	"io"
+    	"net/http"
+
+    	"github.com/ghchinoy/credentio-contributions/go"
+    )
+
+    func ProvenanceMiddleware(v *credentio.Validator) http.HandlerFunc {
+    	return func(w http.ResponseWriter, r *http.Request) {
+    		data, err := io.ReadAll(io.LimitReader(r.Body, 50<<20)) // 50 MB limit
+    		if err != nil {
+    			http.Error(w, "failed to read body", http.StatusBadRequest)
+    			return
+    		}
+
+    		report, err := v.ValidateBytes(data, r.Header.Get("Content-Type"))
+    		if err != nil {
+    			http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+    			return
+    		}
+
+    		w.Header().Set("Content-Type", "application/json")
+    		w.Header().Set("X-C2PA-Badge", string(report.Badge()))
+    		_ = json.NewEncoder(w).Encode(report)
+    	}
+    }
+    ```
+  </TabItem>
+
+  <TabItem label="Git Pre-Commit Hook" icon="seti:shell">
+    ```bash
+    #!/usr/bin/env bash
+    # .git/hooks/pre-commit: Reject staged media files with tampered C2PA manifests
+    set -euo pipefail
+
+    STAGED_MEDIA=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(jpg|jpeg|png|webp|mp4|mov|mp3|wav|pdf)$' || true)
+
+    for file in $STAGED_MEDIA; do
+      credentio validate "$file" >/dev/null 2>&1 || EXIT_CODE=$?
+      if [[ "${EXIT_CODE:-0}" -eq 2 ]]; then
+        echo "ERROR: Staged asset '$file' has an INVALID C2PA signature." >&2
+        exit 1
+      fi
+    done
+    ```
+  </TabItem>
+</Tabs>

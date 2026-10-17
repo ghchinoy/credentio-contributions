@@ -15,6 +15,14 @@
 package credentio
 
 import (
+	"bytes"
+	"image"
+	"image/color"
+	"image/jpeg"
+	"image/png"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -407,4 +415,149 @@ func TestSniffMediaType(t *testing.T) {
 		}
 	}
 }
+
+func createSamplePNGBytes(t *testing.T) []byte {
+	t.Helper()
+	img := image.NewRGBA(image.Rect(0, 0, 16, 16))
+	for y := 0; y < 16; y++ {
+		for x := 0; x < 16; x++ {
+			img.Set(x, y, color.RGBA{R: 40, G: 120, B: 220, A: 255})
+		}
+	}
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		t.Fatalf("failed to encode sample PNG: %v", err)
+	}
+	return buf.Bytes()
+}
+
+func createSampleJPEGBytes(t *testing.T) []byte {
+	t.Helper()
+	img := image.NewRGBA(image.Rect(0, 0, 16, 16))
+	for y := 0; y < 16; y++ {
+		for x := 0; x < 16; x++ {
+			img.Set(x, y, color.RGBA{R: 220, G: 80, B: 40, A: 255})
+		}
+	}
+	var buf bytes.Buffer
+	if err := jpeg.Encode(&buf, img, &jpeg.Options{Quality: 90}); err != nil {
+		t.Fatalf("failed to encode sample JPEG: %v", err)
+	}
+	return buf.Bytes()
+}
+
+func TestSignAndValidateBytes_RoundTrip(t *testing.T) {
+	pki, err := GenerateTestPKI("Credentio Go Test")
+	if err != nil {
+		t.Fatalf("GenerateTestPKI failed: %v", err)
+	}
+
+	signer, err := NewSigner(
+		pki.ClaimSignerKeyPEM,
+		pki.ClaimSignerCertPEM,
+		WithTSACredentials(pki.TSAKeyPEM, pki.TSACertPEM),
+		WithGeneratorInfo("GoCredentioSigner", "0.2.0"),
+	)
+	if err != nil {
+		t.Fatalf("NewSigner failed: %v", err)
+	}
+	defer signer.Close()
+
+	rawPNG := createSamplePNGBytes(t)
+	signRes, err := signer.SignBytes(rawPNG, &SignParams{
+		MediaType:         "image/png",
+		DigitalSourceType: DigitalSourceTypeDigitalCapture,
+		CustomAssertions: map[string]any{
+			"c2pa.training-mining": map[string]any{
+				"entries": map[string]any{
+					"c2pa.ai_generative_training": map[string]any{"use": "notAllowed"},
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("SignBytes failed: %v", err)
+	}
+	if len(signRes.SignedBytes) <= len(rawPNG) {
+		t.Fatalf("expected signed PNG (%d bytes) to be larger than source (%d bytes)", len(signRes.SignedBytes), len(rawPNG))
+	}
+
+	validator, err := NewValidator(
+		WithClaimSignerTrust(pki.RootCACertPEM),
+		WithTSATrust(pki.RootCACertPEM),
+		WithSkipTrustChecks(false),
+	)
+	if err != nil {
+		t.Fatalf("NewValidator failed: %v", err)
+	}
+	defer validator.Close()
+
+	report, err := validator.ValidateBytes(signRes.SignedBytes, "image/png")
+	if err != nil {
+		t.Fatalf("ValidateBytes failed on signed PNG: %v", err)
+	}
+
+	if !report.HasCredentials {
+		t.Fatalf("expected signed PNG to have credentials")
+	}
+	if report.Badge() != BadgeSigned {
+		t.Fatalf("expected badge %q, got %q (statuses: %+v)", BadgeSigned, report.Badge(), report.ActiveManifest.ValidationStatuses)
+	}
+	if report.ActiveManifest == nil {
+		t.Fatalf("expected ActiveManifest to be present")
+	}
+	if !strings.Contains(report.ActiveManifest.ClaimGenerator, "GoCredentioSigner") {
+		t.Errorf("expected ClaimGenerator to contain 'GoCredentioSigner', got %q", report.ActiveManifest.ClaimGenerator)
+	}
+}
+
+func TestSignAndValidateFile_RoundTrip(t *testing.T) {
+	pki, err := GenerateTestPKI("Credentio File Test")
+	if err != nil {
+		t.Fatalf("GenerateTestPKI failed: %v", err)
+	}
+
+	tmpDir := t.TempDir()
+	inPath := filepath.Join(tmpDir, "source.jpg")
+	outPath := filepath.Join(tmpDir, "signed.jpg")
+
+	if err := os.WriteFile(inPath, createSampleJPEGBytes(t), 0644); err != nil {
+		t.Fatalf("failed to write input JPEG: %v", err)
+	}
+
+	signer, err := NewSigner(
+		pki.ClaimSignerKeyPEM,
+		pki.ClaimSignerCertPEM,
+		WithGeneratorInfo("GoFileSigner", "0.2.0"),
+	)
+	if err != nil {
+		t.Fatalf("NewSigner failed: %v", err)
+	}
+	defer signer.Close()
+
+	signRes, err := signer.SignFile(inPath, outPath, &SignParams{
+		DigitalSourceType: DigitalSourceTypeTrainedAlgorithmicMedia,
+	})
+	if err != nil {
+		t.Fatalf("SignFile failed: %v", err)
+	}
+	if signRes.ByteSize == 0 {
+		t.Errorf("expected non-zero output file size")
+	}
+
+	validator, err := NewValidator(WithSkipTrustChecks(true))
+	if err != nil {
+		t.Fatalf("NewValidator failed: %v", err)
+	}
+	defer validator.Close()
+
+	report, err := validator.ValidateFile(outPath, "")
+	if err != nil {
+		t.Fatalf("ValidateFile failed: %v", err)
+	}
+	if !report.HasCredentials || report.Badge() != BadgeSigned {
+		t.Fatalf("expected signed JPEG to validate as SIGNED, got badge=%s", report.Badge())
+	}
+}
+
 

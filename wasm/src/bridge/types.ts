@@ -37,7 +37,29 @@ export interface CredentioEmscriptenModule {
   ): number;
   _cr_last_error(validatorPtr: number): number;
   _cr_last_internal_seconds(validatorPtr: number): number;
+  _cr_signer_create?(
+    claimSignerKeyPem: number,
+    claimSignerCertPem: number,
+    tsaKeyPem: number,
+    tsaCertPem: number,
+    generatorName: number,
+    generatorVersion: number
+  ): number;
+  _cr_signer_free?(signerPtr: number): void;
+  _cr_sign_bytes?(
+    signerPtr: number,
+    bytesPtr: number,
+    count: number,
+    mediaTypePtr: number,
+    digitalSourceTypePtr: number,
+    customAssertionsJsonPtr: number,
+    outSizePtr: number,
+    outStatusPtr: number
+  ): number;
+  _cr_signer_last_error?(signerPtr: number): number;
+  _cr_signer_last_internal_seconds?(signerPtr: number): number;
   _cr_string_free(strPtr: number): void;
+  _cr_bytes_free?(bytesPtr: number): void;
   _cr_version(): number;
 
   _malloc(size: number): number;

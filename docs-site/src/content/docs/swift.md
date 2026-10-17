@@ -128,7 +128,31 @@ if SupportedFormats.isSupported(imageURL) {
 
 ---
 
-## 5. SwiftUI Integration Example
+## 5. In-Process C2PA Signing (`CredentioSigner`)
+
+Use the actor-isolated `CredentioSigner` to embed and sign C2PA manifests on disk or in memory (`Data`):
+
+```swift
+import CredentioKit
+
+let signer = try CredentioSigner(
+    claimSignerKeyPEM: keyPEM,
+    claimSignerCertPEM: certPEM,
+    generatorName: "MyMacApp",
+    generatorVersion: "1.0.0"
+)
+
+let result = try await signer.sign(
+    inputURL: URL(fileURLWithPath: "input.png"),
+    outputURL: URL(fileURLWithPath: "signed.png"),
+    digitalSourceType: "http://cv.iptc.org/newscodes/digitalsourcetype/digitalCapture"
+)
+print("Signed \(result.byteSize) bytes")
+```
+
+---
+
+## 6. SwiftUI Integration Example
 
 Here is a complete pattern for integrating `CredentioNativeEngine` into a modern SwiftUI application using `@Observable` and Swift 6 concurrency:
 

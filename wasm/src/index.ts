@@ -48,8 +48,14 @@ export {
   type RawValidationResult
 } from './bridge/wasm-bridge.js';
 
-// High-level Validator API
+// High-level Validator & Signer APIs
 export {
   CredentioValidator,
   type ValidatorOptions
 } from './validator.js';
+export {
+  CredentioSigner,
+  type SignBytesParams,
+  type SignerOptions,
+  type SignResult
+} from './signer.js';

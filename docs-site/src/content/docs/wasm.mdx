@@ -262,6 +262,30 @@ class CredentioValidator implements Disposable {
 | `locateFile` | `(path: string, prefix: string) => string` | Custom hook to resolve path to `credentio.wasm`. |
 | `wasmBinary` | `Uint8Array \| ArrayBuffer` | Pre-fetched WebAssembly binary buffer. |
 
+### `CredentioSigner` (Client-Side C2PA Signing)
+
+```typescript
+import { CredentioSigner } from '@ghchinoy/credentio-wasm';
+
+using signer = await CredentioSigner.create({
+  claimSignerKeyPem,
+  claimSignerCertPem,
+  generatorName: 'MyWebStudio',
+  generatorVersion: '1.0.0',
+});
+
+// Sign a Uint8Array / ArrayBuffer or a browser Blob/File:
+const { signedBytes, coreSeconds } = await signer.signBytes(imageBytes, {
+  mediaType: 'image/png',
+  digitalSourceType: 'http://cv.iptc.org/newscodes/digitalsourcetype/digitalCapture',
+  customAssertions: {
+    'c2pa.training-mining': {
+      entries: { 'c2pa.ai_generative_training': { use: 'notAllowed' } },
+    },
+  },
+});
+```
+
 ---
 
 ## 5. Data Models

@@ -21,16 +21,41 @@
 #include <optional>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
+#include "claim/local_signer.h"
 #include "crypto/crypto_read_handler.h"
+#include "crypto/crypto_write_handler.h"
 #include "crypto/default/default_crypto_read_handler.h"
+#include "crypto/default/hasher.h"
+#include "crypto/default/pem.h"
+#include "crypto/hash.h"
+#include "crypto/templated_crypto_write_handler.h"
+#include "formats/bmff/writer.h"
+#include "formats/gif/writer.h"
+#include "formats/id3/writer.h"
+#include "formats/jpeg/writer.h"
+#include "formats/pdf/writer.h"
+#include "formats/png/writer.h"
+#include "formats/riff/writer.h"
+#include "formats/tiff/writer.h"
+#include "formats/zip/writer.h"
+#include "generator/generator.h"
+#include "generator/generator_factory.h"
+#include "generator/generator_options.h"
 #include "nlohmann/json.hpp"
+#include "proto/generator.pb.h"
 #include "riegeli/bytes/cfile_reader.h"
+#include "riegeli/bytes/cfile_writer.h"
+#include "riegeli/bytes/reader.h"
 #include "riegeli/bytes/string_reader.h"
+#include "riegeli/bytes/string_writer.h"
+#include "riegeli/bytes/writer.h"
+#include "testing/local_key_crypto_write_handler.h"
 #include "utils/crjson.h"
 #include "utils/media_type.h"
 #include "validator/asset_validator_impl.h"
@@ -46,6 +71,15 @@ struct cr_validator {
   double last_internal_seconds = 0.0;
 
   std::unique_ptr<credentio::AssetValidatorImpl> validator;
+};
+
+struct cr_signer {
+  credentio::LocalKeyCryptoWriteHandlerOptions crypto_options;
+  std::string generator_name;
+  std::string generator_version;
+
+  std::string last_error;
+  double last_internal_seconds = 0.0;
 };
 
 namespace {
@@ -103,6 +137,18 @@ std::optional<std::string> SniffMediaType(riegeli::Reader& reader) {
     return "application/pdf";
   }
 
+  // TIFF header (little-endian II* or big-endian MM*)
+  if (length_read >= 4 &&
+      ((b[0] == 0x49 && b[1] == 0x49 && b[2] == 0x2A && b[3] == 0x00) ||
+       (b[0] == 0x4D && b[1] == 0x4D && b[2] == 0x00 && b[3] == 0x2A))) {
+    return "image/tiff";
+  }
+
+  // ZIP / OOXML header (PK\x03\x04)
+  if (length_read >= 4 && b[0] == 0x50 && b[1] == 0x4B && b[2] == 0x03 && b[3] == 0x04) {
+    return "application/zip";
+  }
+
   // RIFF container
   if (length_read >= 12 && b[0] == 0x52 && b[1] == 0x49 && b[2] == 0x46 && b[3] == 0x46) {
     absl::string_view form(buf + 8, 4);
@@ -117,6 +163,7 @@ std::optional<std::string> SniffMediaType(riegeli::Reader& reader) {
     if (brand == "avif" || brand == "avis") return "image/avif";
     if (brand == "heic" || brand == "heix" || brand == "mif1") return "image/heic";
     if (brand == "M4A ") return "audio/mp4";
+    if (brand == "qt  ") return "video/quicktime";
     return "video/mp4";
   }
 
@@ -154,6 +201,184 @@ absl::StatusOr<std::string> ValidateReaderAndGenerateCrJson(
   }
 
   return crjson->dump(2);
+}
+
+absl::Status BuildSignRequest(
+    cr_signer* s,
+    const char* digital_source_type,
+    const char* custom_assertions_json,
+    credentio::GenerateManifestStoreRequest* request) {
+  auto* created = request->mutable_actions()->mutable_created();
+  if (digital_source_type && strlen(digital_source_type) > 0) {
+    created->set_digital_source_type(digital_source_type);
+  }
+  auto* agent = created->mutable_action_metadata()->mutable_software_agent();
+  agent->set_name(s->generator_name);
+  if (!s->generator_version.empty()) {
+    agent->set_version(s->generator_version);
+  }
+
+  if (custom_assertions_json && strlen(custom_assertions_json) > 0) {
+    nlohmann::json parsed =
+        nlohmann::json::parse(custom_assertions_json, nullptr, /*allow_exceptions=*/false);
+    if (parsed.is_discarded()) {
+      return absl::InvalidArgumentError("Invalid JSON in custom_assertions_json");
+    }
+    if (parsed.is_object()) {
+      for (auto it = parsed.begin(); it != parsed.end(); ++it) {
+        if (it.key().empty()) {
+          return absl::InvalidArgumentError("Custom assertion label cannot be empty");
+        }
+        auto* ga = request->add_gathered_assertions();
+        ga->set_label(it.key());
+        ga->set_data(it.value().dump());
+        ga->set_content_type(credentio::GatheredAssertion::CONTENT_TYPE_JSON);
+      }
+    } else if (parsed.is_array()) {
+      for (const auto& item : parsed) {
+        if (!item.is_object() || !item.contains("label") || !item["label"].is_string() ||
+            !item.contains("data")) {
+          return absl::InvalidArgumentError(
+              "Custom assertions array items must be objects with 'label' and 'data'");
+        }
+        std::string label = item["label"].get<std::string>();
+        if (label.empty()) {
+          return absl::InvalidArgumentError("Custom assertion label cannot be empty");
+        }
+        auto* ga = request->add_gathered_assertions();
+        ga->set_label(std::move(label));
+        ga->set_data(item["data"].dump());
+        ga->set_content_type(credentio::GatheredAssertion::CONTENT_TYPE_JSON);
+      }
+    } else {
+      return absl::InvalidArgumentError(
+          "custom_assertions_json must be a JSON object or array");
+    }
+  }
+
+  return absl::OkStatus();
+}
+
+absl::Status SignReaderToWriter(
+    cr_signer* s,
+    riegeli::Reader& source,
+    riegeli::Writer& destination,
+    absl::string_view media_type,
+    const char* digital_source_type,
+    const char* custom_assertions_json) {
+  credentio::GenerateManifestStoreRequest request;
+  absl::Status req_status =
+      BuildSignRequest(s, digital_source_type, custom_assertions_json, &request);
+  if (!req_status.ok()) {
+    return req_status;
+  }
+
+  auto crypto_write_handler =
+      credentio::CreateLocalKeyCryptoWriteHandler(s->crypto_options);
+  if (!crypto_write_handler.ok()) {
+    return crypto_write_handler.status();
+  }
+
+  const credentio::HasherFactory& hash_factory = credentio::DefaultHasherFactory();
+  credentio::TemplatedHasherFactory template_hash_factory(hash_factory.algorithm());
+  credentio::TemplatedCryptoWriteHandler template_crypto_write_handler(
+      crypto_write_handler->get());
+
+  credentio::LocalClaimSigner template_claim_signer(&template_crypto_write_handler,
+                                                    &template_hash_factory);
+  credentio::LocalClaimSigner signing_claim_signer(crypto_write_handler->get(),
+                                                   &hash_factory);
+
+  credentio::GeneratorOptions generator_options;
+  generator_options.generator_info.set_name(s->generator_name);
+  if (!s->generator_version.empty()) {
+    generator_options.generator_info.set_version(s->generator_version);
+  }
+  generator_options.signing_claim_signer = &signing_claim_signer;
+  generator_options.template_claim_signer = &template_claim_signer;
+  generator_options.hash_factory = &hash_factory;
+
+  auto generator = credentio::CreateGenerator(std::move(generator_options));
+  if (!generator.ok()) {
+    return generator.status();
+  }
+
+  const auto start_time = std::chrono::high_resolution_clock::now();
+  absl::Status write_status;
+
+  if (media_type == "image/png") {
+    credentio::PngWriter writer(generator->get());
+    write_status = writer.Write(std::move(request), &source, &destination,
+                                /*output_metadata=*/nullptr);
+  } else if (media_type == "image/jpeg") {
+    credentio::JpegWriter writer(generator->get());
+    write_status = writer.Write(std::move(request), &source, &destination,
+                                /*output_metadata=*/nullptr);
+  } else if (media_type == "image/gif") {
+    credentio::GifWriter writer(generator->get());
+    write_status = writer.Write(std::move(request), &source, &destination,
+                                /*output_metadata=*/nullptr);
+  } else if (media_type == "video/mp4" || media_type == "video/quicktime" ||
+             media_type == "image/heic" || media_type == "image/heif" ||
+             media_type == "image/avif" || media_type == "audio/mp4") {
+    credentio::BmffWriter writer(generator->get());
+    write_status = writer.Write(std::move(request), &source, &destination,
+                                /*output_metadata=*/nullptr);
+  } else if (media_type == "image/tiff" || media_type == "image/tiff-fx" ||
+             media_type == "image/x-adobe-dng") {
+    credentio::TiffWriter writer(generator->get());
+    write_status = writer.Write(std::move(request), &source, &destination,
+                                /*output_metadata=*/nullptr);
+  } else if (media_type == "image/webp" || media_type == "audio/wav" ||
+             media_type == "audio/x-wav" || media_type == "audio/vnd.wave" ||
+             media_type == "video/x-msvideo" || media_type == "video/avi") {
+    credentio::RiffWriter writer(generator->get());
+    write_status = writer.Write(std::move(request), &source, &destination,
+                                /*output_metadata=*/nullptr);
+  } else if (media_type == "audio/mpeg" || media_type == "audio/mp3" ||
+             media_type == "audio/flac" || media_type == "audio/x-flac") {
+    credentio::Id3Writer writer(generator->get());
+    write_status = writer.Write(std::move(request), &source, &destination);
+  } else if (media_type == "application/pdf") {
+    credentio::PdfWriter writer(generator->get());
+    write_status = writer.Write(std::move(request), &source, &destination);
+  } else if (media_type == "application/zip" ||
+             media_type ==
+                 "application/"
+                 "vnd.openxmlformats-officedocument.presentationml.presentation" ||
+             media_type ==
+                 "application/"
+                 "vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+             media_type ==
+                 "application/"
+                 "vnd.openxmlformats-officedocument.spreadsheetml.sheet") {
+    credentio::ZipWriter writer(generator->get());
+    write_status = writer.Write(request, &source, &destination);
+  } else {
+    write_status = absl::UnimplementedError(
+        absl::StrCat("Unsupported media type for signing: ", media_type));
+  }
+
+  const auto end_time = std::chrono::high_resolution_clock::now();
+  const std::chrono::duration<double> diff = end_time - start_time;
+  s->last_internal_seconds = diff.count();
+
+  return write_status;
+}
+
+int MapStatusToCode(const absl::Status& status) {
+  if (status.ok()) return CR_STATUS_OK;
+  switch (status.code()) {
+    case absl::StatusCode::kInvalidArgument:
+      return CR_STATUS_INVALID_ARGUMENT;
+    case absl::StatusCode::kUnimplemented:
+      return CR_STATUS_UNSUPPORTED_FORMAT;
+    case absl::StatusCode::kNotFound:
+    case absl::StatusCode::kPermissionDenied:
+      return CR_STATUS_IO_ERROR;
+    default:
+      return CR_STATUS_INTERNAL_ERROR;
+  }
 }
 
 }  // namespace
@@ -321,12 +546,222 @@ double cr_last_internal_seconds(cr_validator* validator) {
   return validator->last_internal_seconds;
 }
 
+cr_signer* cr_signer_create(
+    const char* claim_signer_key_pem,
+    const char* claim_signer_cert_pem,
+    const char* tsa_key_pem,
+    const char* tsa_cert_pem,
+    const char* generator_name,
+    const char* generator_version) {
+  if (!claim_signer_key_pem || strlen(claim_signer_key_pem) == 0 ||
+      !claim_signer_cert_pem || strlen(claim_signer_cert_pem) == 0) {
+    return nullptr;
+  }
+
+  auto s = std::make_unique<cr_signer>();
+  s->crypto_options.claim_signer.key_pem = claim_signer_key_pem;
+
+  auto cert_chain = credentio::LoadCertsFromPem(claim_signer_cert_pem);
+  if (!cert_chain.ok() || cert_chain->empty()) {
+    return nullptr;
+  }
+  s->crypto_options.claim_signer.certificate_chain = *std::move(cert_chain);
+
+  const bool has_tsa_key = (tsa_key_pem && strlen(tsa_key_pem) > 0);
+  const bool has_tsa_cert = (tsa_cert_pem && strlen(tsa_cert_pem) > 0);
+  if (has_tsa_key != has_tsa_cert) {
+    return nullptr;
+  }
+
+  if (has_tsa_key && has_tsa_cert) {
+    s->crypto_options.disable_timestamping = false;
+    s->crypto_options.tsa.key_pem = tsa_key_pem;
+    s->crypto_options.tsa.cert_pem = tsa_cert_pem;
+  } else {
+    s->crypto_options.disable_timestamping = true;
+  }
+
+  s->generator_name =
+      (generator_name && strlen(generator_name) > 0) ? generator_name : "Credentio";
+  s->generator_version =
+      (generator_version && strlen(generator_version) > 0) ? generator_version : "0.2.0";
+
+  // Validate that the key and certificate chain can initialize a write handler
+  auto test_handler = credentio::CreateLocalKeyCryptoWriteHandler(s->crypto_options);
+  if (!test_handler.ok()) {
+    return nullptr;
+  }
+
+  return s.release();
+}
+
+void cr_signer_free(cr_signer* signer) {
+  delete signer;
+}
+
+int cr_sign_file(
+    cr_signer* signer,
+    const char* input_path,
+    const char* output_path,
+    const char* media_type,
+    const char* digital_source_type,
+    const char* custom_assertions_json) {
+  if (!signer || !input_path || !output_path) {
+    if (signer) signer->last_error = "Null argument passed to cr_sign_file";
+    return CR_STATUS_INVALID_ARGUMENT;
+  }
+
+  signer->last_error.clear();
+  signer->last_internal_seconds = 0.0;
+
+  if (strcmp(input_path, output_path) == 0) {
+    signer->last_error =
+        "In-place signing is not supported; output_path must differ from input_path";
+    return CR_STATUS_INVALID_ARGUMENT;
+  }
+
+  riegeli::CFileReader<> source(input_path);
+  if (!source.ok()) {
+    signer->last_error = absl::StrCat("Failed to open input file: ", source.status().message());
+    return CR_STATUS_IO_ERROR;
+  }
+
+  std::optional<std::string> resolved_media_type;
+  if (media_type && strlen(media_type) > 0) {
+    resolved_media_type = media_type;
+  } else {
+    auto mt = credentio::MediaType(input_path);
+    if (mt.ok()) {
+      resolved_media_type = *mt;
+    } else {
+      auto sniffed = SniffMediaType(source);
+      if (sniffed.has_value()) {
+        resolved_media_type = std::move(sniffed);
+      }
+    }
+  }
+
+  if (!resolved_media_type.has_value()) {
+    signer->last_error = "Could not determine media type of input asset";
+    return CR_STATUS_INVALID_ARGUMENT;
+  }
+
+  riegeli::CFileWriter<> destination(
+      output_path, riegeli::CFileWriterBase::Options().set_read(true));
+  if (!destination.ok()) {
+    signer->last_error =
+        absl::StrCat("Failed to open output file: ", destination.status().message());
+    return CR_STATUS_IO_ERROR;
+  }
+
+  absl::Status status = SignReaderToWriter(
+      signer, source, destination, *resolved_media_type, digital_source_type,
+      custom_assertions_json);
+  if (!status.ok()) {
+    signer->last_error = std::string(status.message());
+    return MapStatusToCode(status);
+  }
+
+  if (!source.Close()) {
+    signer->last_error = std::string(source.status().message());
+    return CR_STATUS_IO_ERROR;
+  }
+  if (!destination.Close()) {
+    signer->last_error = std::string(destination.status().message());
+    return CR_STATUS_IO_ERROR;
+  }
+
+  return CR_STATUS_OK;
+}
+
+uint8_t* cr_sign_bytes(
+    cr_signer* signer,
+    const uint8_t* bytes,
+    size_t count,
+    const char* media_type,
+    const char* digital_source_type,
+    const char* custom_assertions_json,
+    size_t* out_size,
+    int* out_status) {
+  if (out_size) *out_size = 0;
+  if (!signer || !bytes || count == 0 || !out_size) {
+    if (signer) signer->last_error = "Invalid arguments passed to cr_sign_bytes";
+    if (out_status) *out_status = CR_STATUS_INVALID_ARGUMENT;
+    return nullptr;
+  }
+
+  signer->last_error.clear();
+  signer->last_internal_seconds = 0.0;
+
+  absl::string_view bytes_view(reinterpret_cast<const char*>(bytes), count);
+  riegeli::StringReader<> source(bytes_view);
+
+  std::optional<std::string> resolved_media_type;
+  if (media_type && strlen(media_type) > 0) {
+    resolved_media_type = media_type;
+  } else {
+    auto sniffed = SniffMediaType(source);
+    if (sniffed.has_value()) {
+      resolved_media_type = std::move(sniffed);
+    }
+  }
+
+  if (!resolved_media_type.has_value()) {
+    signer->last_error = "Media type could not be determined from bytes";
+    if (out_status) *out_status = CR_STATUS_INVALID_ARGUMENT;
+    return nullptr;
+  }
+
+  std::string dest_bytes;
+  riegeli::StringWriter<> destination(&dest_bytes);
+
+  absl::Status status = SignReaderToWriter(
+      signer, source, destination, *resolved_media_type, digital_source_type,
+      custom_assertions_json);
+  if (!status.ok()) {
+    signer->last_error = std::string(status.message());
+    if (out_status) *out_status = MapStatusToCode(status);
+    return nullptr;
+  }
+
+  if (!source.Close() || !destination.Close()) {
+    signer->last_error = "Failed to flush in-memory asset writer";
+    if (out_status) *out_status = CR_STATUS_IO_ERROR;
+    return nullptr;
+  }
+
+  uint8_t* copy = static_cast<uint8_t*>(malloc(dest_bytes.size()));
+  if (!copy) {
+    signer->last_error = "Out of memory allocating signed asset buffer";
+    if (out_status) *out_status = CR_STATUS_INTERNAL_ERROR;
+    return nullptr;
+  }
+  memcpy(copy, dest_bytes.data(), dest_bytes.size());
+  *out_size = dest_bytes.size();
+  if (out_status) *out_status = CR_STATUS_OK;
+  return copy;
+}
+
+const char* cr_signer_last_error(cr_signer* signer) {
+  if (!signer) return "Null signer";
+  return signer->last_error.c_str();
+}
+
+double cr_signer_last_internal_seconds(cr_signer* signer) {
+  if (!signer) return 0.0;
+  return signer->last_internal_seconds;
+}
+
 void cr_string_free(char* str) {
   free(str);
 }
 
+void cr_bytes_free(uint8_t* bytes) {
+  free(bytes);
+}
+
 const char* cr_version(void) {
-  return "0.1.9-credentio-c";
+  return "0.2.0-credentio-c";
 }
 
 }  // extern "C"
