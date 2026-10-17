@@ -17,11 +17,11 @@ git clone https://mediaprovenance.googlesource.com/credentio
 ```
 
 ### Step 2: Check Out the Validated Commit
-Credentio recommends living at `HEAD`, but upstream changes can introduce breaking schema or C++ API updates without notice. This repository tracks an authoritative baseline in `.credentio-pin` (validated against commit **`4ac69fc`**):
+Credentio recommends living at `HEAD`, but upstream changes can introduce breaking schema or C++ API updates without notice. This repository tracks an authoritative baseline in `.credentio-pin` (validated against commit **`cdc4101`**):
 
 ```bash
 cd credentio
-git checkout 4ac69fc58256d3871e765f615254373e19e250e9
+git checkout cdc4101b6fd26415a461f3de38f7b64ea995714e
 ```
 
 You can verify whether upstream Credentio has moved beyond the pinned baseline:

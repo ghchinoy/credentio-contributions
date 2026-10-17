@@ -28,6 +28,9 @@ jobs:
   check-drift:
     name: Check Google Credentio Drift
     runs-on: ubuntu-latest
+    outputs:
+      upstream_sha: ${{ steps.drift_check.outputs.upstream_sha }}
+      exit_code: ${{ steps.drift_check.outputs.exit_code }}
     steps:
       - uses: actions/checkout@v4
 
@@ -114,7 +117,10 @@ jobs:
 
   verify-builds:
     name: Verify Builds & Native Bindings (macOS)
+    needs: check-drift
     runs-on: macos-14
+    env:
+      CREDENTIO_SHA: ${{ needs.check-drift.outputs.upstream_sha }}
     steps:
       - uses: actions/checkout@v4
 

@@ -105,7 +105,7 @@ make clean
 4. **Distribution Reality:**
    Packages are currently source-distributed. Documentation examples must show build-from-source workflows (e.g. `make build-swift` followed by `.package(path: ...)`) rather than remote release tags until official releases are published.
 5. **Upstream Commit Pinning & Drift Detection:**
-   Build scripts source the authoritative commit from `.credentio-pin` (baseline: `4ac69fc58256d3871e765f615254373e19e250e9`). Run `make check-drift` or trigger the scheduled `drift-check.yml` workflow to detect upstream movement prior to bumping the baseline.
+   Build scripts source the authoritative commit from `.credentio-pin` (baseline: `cdc4101b6fd26415a461f3de38f7b64ea995714e`). Run `make check-drift` or trigger the scheduled `drift-check.yml` workflow to detect upstream movement prior to bumping the baseline.
 6. **Architecture Decisions:**
    Substantial architectural choices, FFI changes, or engine models must be recorded as Architecture Decision Records in `docs/adr/`.
 7. **CGO Dynamic Linking and Runtime RPATH:**

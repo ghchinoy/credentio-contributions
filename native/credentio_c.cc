@@ -28,7 +28,6 @@
 #include "absl/strings/string_view.h"
 #include "crypto/crypto_read_handler.h"
 #include "crypto/default/default_crypto_read_handler.h"
-#include "formats/core_registry.h"
 #include "nlohmann/json.hpp"
 #include "riegeli/bytes/cfile_reader.h"
 #include "riegeli/bytes/string_reader.h"
@@ -148,23 +147,8 @@ absl::StatusOr<std::string> ValidateReaderAndGenerateCrJson(
     return absl::NotFoundError("No C2PA validation result produced");
   }
 
-  auto registry = credentio::CreateCoreFormatRegistry();
-  auto format = registry->GetFormat(*media_type_opt);
-  if (!format.ok()) {
-    return format.status();
-  }
-
-  if (!reader.Seek(0) || reader.pos() != 0) {
-    return absl::DataLossError("Failed to seek to start of asset reader");
-  }
-
-  auto manifest_store = (*format)->extractor()->ExtractManifestStore(reader);
-  if (!manifest_store.ok()) {
-    return manifest_store.status();
-  }
-
   absl::StatusOr<nlohmann::json> crjson =
-      credentio::ConvertToCrJson(*manifest_store, validation_result->proto());
+      credentio::ConvertToCrJson(*validation_result);
   if (!crjson.ok()) {
     return crjson.status();
   }
@@ -342,7 +326,7 @@ void cr_string_free(char* str) {
 }
 
 const char* cr_version(void) {
-  return "0.1.0-credentio-c";
+  return "0.1.9-credentio-c";
 }
 
 }  // extern "C"

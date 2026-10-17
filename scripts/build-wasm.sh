@@ -22,7 +22,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 PIN_FILE="${REPO_DIR}/.credentio-pin"
-DEFAULT_SHA="4ac69fc58256d3871e765f615254373e19e250e9"
+DEFAULT_SHA="cdc4101b6fd26415a461f3de38f7b64ea995714e"
 if [[ -f "${PIN_FILE}" ]]; then
   DEFAULT_SHA="$(tr -d '[:space:]' < "${PIN_FILE}")"
 fi
@@ -30,17 +30,21 @@ fi
 CREDENTIO_GIT_URL="${CREDENTIO_GIT_URL:-https://mediaprovenance.googlesource.com/credentio}"
 CREDENTIO_SHA="${CREDENTIO_SHA:-${DEFAULT_SHA}}"
 
-DIRECT_BUILD=0
+CONTAINER_BUILD=0
 for arg in "$@"; do
   case "${arg}" in
-    --direct|--in-container)
-      DIRECT_BUILD=1
+    --direct)
+      CONTAINER_BUILD=0
+      ;;
+    --in-container|--container)
+      CONTAINER_BUILD=1
       ;;
     -h|--help)
       echo "Usage: ./scripts/build-wasm.sh [options]"
       echo ""
       echo "Options:"
-      echo "  --direct       Build directly on host (requires bazel + em++ in PATH or EMSDK)"
+      echo "  --direct       Build directly on host via Bazel + @emsdk (default when bazel is installed)"
+      echo "  --container    Build inside container runtime (Apple container / Docker / Podman)"
       echo "  -h, --help     Show this help message"
       echo ""
       echo "Environment variables:"
@@ -63,21 +67,21 @@ run_direct_build() {
   local output_dir="$1"
   local work_dir
   work_dir="$(mktemp -d /tmp/credentio-wasm-build.XXXXXX)"
-  trap 'rm -rf "${work_dir}"' EXIT
 
   echo "==> [Direct] Cloning Google Credentio (${CREDENTIO_SHA:0:7})..."
-  git clone --depth 1 "${CREDENTIO_GIT_URL}" "${work_dir}/credentio"
-  cd "${work_dir}/credentio"
-  git checkout "${CREDENTIO_SHA}" 2>/dev/null || true
+  git clone "${CREDENTIO_GIT_URL}" "${work_dir}/credentio"
+  (
+    cd "${work_dir}/credentio"
+    git checkout "${CREDENTIO_SHA}"
 
-  echo "==> [Direct] Configuring emsdk Bazel toolchain..."
-  echo 'bazel_dep(name = "emsdk", version = "6.0.8")' >> MODULE.bazel
+    echo "==> [Direct] Configuring emsdk Bazel toolchain..."
+    echo 'bazel_dep(name = "emsdk", version = "6.0.8")' >> MODULE.bazel
 
-  mkdir -p bindings_c
-  cp "${REPO_DIR}/native/credentio_c.h" bindings_c/
-  cp "${REPO_DIR}/native/credentio_c.cc" bindings_c/
+    mkdir -p bindings_c
+    cp "${REPO_DIR}/native/credentio_c.h" bindings_c/
+    cp "${REPO_DIR}/native/credentio_c.cc" bindings_c/
 
-  cat << 'BAZEL_EOF' > bindings_c/BUILD
+    cat << 'BAZEL_EOF' > bindings_c/BUILD
 load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
 
 package(default_visibility = ["//visibility:public"])
@@ -90,7 +94,6 @@ cc_library(
     deps = [
         "//crypto:crypto_read_handler",
         "//crypto/default:default_crypto_read_handler",
-        "//formats:core_registry",
         "//utils:crjson",
         "//utils:media_type",
         "//validator:asset_validator_impl",
@@ -128,24 +131,26 @@ cc_binary(
 )
 BAZEL_EOF
 
-  echo "==> [Direct] Compiling WebAssembly target via Bazel..."
-  bazel build --platforms=@emsdk//:platform_wasm --cxxopt="-std=c++20" //bindings_c:credentio.js
+    echo "==> [Direct] Compiling WebAssembly target via Bazel..."
+    bazel build --platforms=@emsdk//:platform_wasm --cxxopt="-std=c++20" //bindings_c:credentio.js
 
-  echo "==> [Direct] Extracting WebAssembly bundle..."
-  mkdir -p "${work_dir}/unpacked"
-  tar -xf bazel-bin/bindings_c/credentio.js -C "${work_dir}/unpacked"
+    echo "==> [Direct] Extracting WebAssembly bundle..."
+    mkdir -p "${work_dir}/unpacked"
+    tar -xf bazel-bin/bindings_c/credentio.js -C "${work_dir}/unpacked"
 
-  cp "${work_dir}/unpacked/credentio.js" "${output_dir}/credentio.js"
-  cp "${work_dir}/unpacked/credentio.wasm" "${output_dir}/credentio.wasm"
-  chmod 644 "${output_dir}"/credentio.*
+    cp "${work_dir}/unpacked/credentio.js" "${output_dir}/credentio.js"
+    cp "${work_dir}/unpacked/credentio.wasm" "${output_dir}/credentio.wasm"
+    chmod 644 "${output_dir}"/credentio.*
+  )
+  rm -rf "${work_dir}"
 }
 
 STAGE_HOST_DIR="$(mktemp -d /tmp/credentio-wasm-stage.XXXXXX)"
 trap 'rm -rf "${STAGE_HOST_DIR}"' EXIT
 
-# Check if direct build was explicitly requested or if running in container / local emsdk
-if [[ "${DIRECT_BUILD}" -eq 1 ]] || (command -v bazel >/dev/null 2>&1 && command -v em++ >/dev/null 2>&1); then
-  echo "==> Detected direct Bazel & Emscripten toolchain in environment."
+# Use direct Bazel build when bazel is available on host and container build was not explicitly requested
+if [[ "${CONTAINER_BUILD}" -eq 0 ]] && command -v bazel >/dev/null 2>&1; then
+  echo "==> Detected Bazel toolchain in environment; using direct @emsdk build."
   run_direct_build "${STAGE_HOST_DIR}"
 else
   # Containerized compilation detection
@@ -202,8 +207,9 @@ else
       set -euo pipefail
       cd /tmp
       echo '==> [Container] Cloning Google Credentio (${CREDENTIO_SHA:0:7})...'
-      git clone --depth 1 ${CREDENTIO_GIT_URL} credentio
+      git clone ${CREDENTIO_GIT_URL} credentio
       cd credentio
+      git checkout ${CREDENTIO_SHA}
 
       echo '==> [Container] Configuring emsdk Bazel toolchain...'
       echo 'bazel_dep(name = \"emsdk\", version = \"6.0.8\")' >> MODULE.bazel
@@ -225,7 +231,6 @@ cc_library(
     deps = [
         \"//crypto:crypto_read_handler\",
         \"//crypto/default:default_crypto_read_handler\",
-        \"//formats:core_registry\",
         \"//utils:crjson\",
         \"//utils:media_type\",
         \"//validator:asset_validator_impl\",

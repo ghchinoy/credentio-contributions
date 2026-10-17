@@ -28,11 +28,11 @@ check-drift: ## Check if upstream Google Credentio has drifted from .credentio-p
 
 python-install: ## Install Python credentio package in editable mode
 	@echo "Installing Python package..."
-	cd python && python3 -m pip install -e ".[dev]"
+	cd python && if command -v uv >/dev/null 2>&1; then uv pip install -e ".[dev]"; else python3 -m pip install -e ".[dev]"; fi
 
 python-test: ## Run Python test suite (pytest)
 	@echo "Running Python tests..."
-	cd python && python3 -m pip install -e ".[dev]" --quiet && python3 -m pytest
+	cd python && if command -v uv >/dev/null 2>&1; then uv run --extra dev pytest; else python3 -m pip install -e ".[dev]" --quiet && python3 -m pytest; fi
 
 go-test: ## Run Go test suite (go test)
 	@echo "Running Go tests..."
@@ -54,7 +54,7 @@ wasm-test: wasm-build ## Run TypeScript WASM test suite (npm test)
 	@echo "Running TypeScript WASM tests..."
 	cd wasm && npm test
 
-test: python-test go-test wasm-test ## Run Python, Go, and WASM test suites
+test: python-test go-test swift-test wasm-test ## Run Python, Go, Swift, and WASM test suites
 
 docs-install: ## Install documentation site dependencies (npm)
 	@echo "Installing documentation dependencies..."

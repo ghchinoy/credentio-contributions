@@ -22,7 +22,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 PIN_FILE="${REPO_DIR}/.credentio-pin"
-DEFAULT_SHA="4ac69fc58256d3871e765f615254373e19e250e9"
+DEFAULT_SHA="cdc4101b6fd26415a461f3de38f7b64ea995714e"
 if [[ -f "${PIN_FILE}" ]]; then
   DEFAULT_SHA="$(tr -d '[:space:]' < "${PIN_FILE}")"
 fi
@@ -52,6 +52,15 @@ if [[ -z "${CREDENTIO_DIR}" || ! -d "${CREDENTIO_DIR}" ]]; then
   git clone "${CREDENTIO_GIT_URL}" "${CLONE_DIR}"
   (cd "${CLONE_DIR}" && git checkout "${CREDENTIO_SHA}")
   CREDENTIO_DIR="${CLONE_DIR}"
+else
+  CURRENT_SHA="$(git -C "${CREDENTIO_DIR}" rev-parse HEAD 2>/dev/null || echo "")"
+  if [[ -n "${CREDENTIO_SHA}" && "${CURRENT_SHA}" != "${CREDENTIO_SHA}" ]]; then
+    echo "==> Syncing local Credentio checkout at ${CREDENTIO_DIR} to ${CREDENTIO_SHA:0:7}..."
+    if ! git -C "${CREDENTIO_DIR}" cat-file -e "${CREDENTIO_SHA}^{commit}" 2>/dev/null; then
+      git -C "${CREDENTIO_DIR}" fetch origin
+    fi
+    git -C "${CREDENTIO_DIR}" checkout "${CREDENTIO_SHA}"
+  fi
 fi
 
 echo "==> Using Credentio at: ${CREDENTIO_DIR}"

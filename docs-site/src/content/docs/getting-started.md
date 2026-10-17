@@ -23,13 +23,13 @@ Follow this guide to set up Google Credentio, compile the native libraries, and 
 
 ## 2. Clone Repositories
 
-Because Credentio is developed at `HEAD`, clone the official upstream repository alongside `credentio-contributions` and check out the validated commit (`4ac69fc`):
+Because Credentio is developed at `HEAD`, clone the official upstream repository alongside `credentio-contributions` and check out the validated commit (`cdc4101`):
 
 ```bash
 # 1. Clone Google Credentio:
 git clone https://mediaprovenance.googlesource.com/credentio
 cd credentio
-git checkout 4ac69fc58256d3871e765f615254373e19e250e9
+git checkout cdc4101b6fd26415a461f3de38f7b64ea995714e
 cd ..
 
 # 2. Clone Credentio Contributions:

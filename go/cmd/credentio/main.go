@@ -25,7 +25,7 @@ import (
 	"github.com/ghchinoy/credentio-contributions/go"
 )
 
-const version = "0.1.0"
+const version = "0.1.9"
 
 func printUsage() {
 	fmt.Printf(`Usage: credentio <command> [options]

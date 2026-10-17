@@ -23,7 +23,6 @@ cc_library(
     deps = [
         "//crypto:crypto_read_handler",
         "//crypto/default:default_crypto_read_handler",
-        "//formats:core_registry",
         "//utils:crjson",
         "//utils:media_type",
         "//validator:asset_validator_impl",

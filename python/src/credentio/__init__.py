@@ -27,7 +27,7 @@ from .models import (
 )
 from .validator import CredentioError, Validator
 
-__version__ = "0.1.0"
+__version__ = "0.1.9"
 
 __all__ = [
     "Assertion",

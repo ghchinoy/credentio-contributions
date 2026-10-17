@@ -17,7 +17,7 @@ All contributors and maintainers are expected to follow our [Code of Conduct](CO
    ```bash
    git clone https://mediaprovenance.googlesource.com/credentio
    cd credentio
-   git checkout 4ac69fc58256d3871e765f615254373e19e250e9
+   git checkout cdc4101b6fd26415a461f3de38f7b64ea995714e
    ```
 2. Clone this repository:
    ```bash
