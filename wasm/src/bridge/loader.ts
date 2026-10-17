@@ -60,7 +60,16 @@ export async function loadCredentioWasm(
     }
 
     if (options?.wasmModule) {
-      emscriptenOptions.wasmModule = options.wasmModule;
+      const compiledModule = options.wasmModule;
+      emscriptenOptions.instantiateWasm = (
+        imports: WebAssembly.Imports,
+        successCallback: (instance: WebAssembly.Instance, module: WebAssembly.Module) => void
+      ) => {
+        WebAssembly.instantiate(compiledModule, imports).then((instance) => {
+          successCallback(instance, compiledModule);
+        });
+        return {};
+      };
     }
 
     if (options?.locateFile) {

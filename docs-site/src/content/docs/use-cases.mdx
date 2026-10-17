@@ -26,6 +26,7 @@ Below are practical architectures and runnable starter patterns across all four 
   <TabItem label="Cloudflare Worker Gatekeeper" icon="seti:typescript">
     ```typescript
     import { CredentioValidator } from '@ghchinoy/credentio-wasm';
+    import credentioWasm from '@ghchinoy/credentio-wasm/wasm';
 
     export default {
       async fetch(request: Request, env: { MEDIA_BUCKET: R2Bucket }): Promise<Response> {
@@ -34,7 +35,10 @@ Below are practical architectures and runnable starter patterns across all four 
         }
 
         const mediaBytes = await request.arrayBuffer();
-        using validator = await CredentioValidator.create({ skipTrustChecks: false });
+        using validator = await CredentioValidator.create({
+          wasmModule: credentioWasm,
+          skipTrustChecks: false,
+        });
         const report = await validator.validateBytes(mediaBytes);
 
         // Reject tampered assets at the edge before storage ingestion

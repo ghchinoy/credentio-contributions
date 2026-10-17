@@ -199,11 +199,12 @@ async function verifyLocalAsset(filePath: string) {
 
 ### Edge Runtimes (Cloudflare Workers, Deno, Bun)
 
-`@ghchinoy/credentio-wasm` is isomorphic and contains no native Node.js binary bindings (`node-gyp`). It runs directly inside modern edge runtimes:
+`@ghchinoy/credentio-wasm` is isomorphic and contains no native Node.js binary bindings (`node-gyp`). In Cloudflare Workers (`workerd`), import the pre-compiled `WebAssembly.Module` from `@ghchinoy/credentio-wasm/wasm` and pass it via `wasmModule`:
 
 ```typescript
 // cloudflare-worker.ts
 import { CredentioValidator } from '@ghchinoy/credentio-wasm';
+import credentioWasm from '@ghchinoy/credentio-wasm/wasm';
 
 export default {
   async fetch(request: Request): Promise<Response> {
@@ -212,14 +213,13 @@ export default {
     }
 
     const mediaBuffer = await request.arrayBuffer();
-    const validator = await CredentioValidator.create();
+    using validator = await CredentioValidator.create({
+      wasmModule: credentioWasm,
+      skipTrustChecks: true,
+    });
 
-    try {
-      const report = await validator.validateBytes(mediaBuffer);
-      return Response.json(report);
-    } finally {
-      validator.close();
-    }
+    const report = await validator.validateBytes(mediaBuffer);
+    return Response.json(report);
   },
 };
 ```

@@ -147,4 +147,20 @@ describe.runIf(hasWasmBinary)('Credentio WebAssembly Native Integration Suite', 
     expect(report.primaryClaimGenerator).toContain('WasmCredentioSigner');
     validator.close();
   });
+
+  it('instantiates via pre-compiled WebAssembly.Module (Cloudflare Workers / workerd mode)', async () => {
+    const wasmBytes = fs.readFileSync(wasmLibPath);
+    const compiledModule = await WebAssembly.compile(wasmBytes);
+
+    using validator = await CredentioValidator.create({
+      wasmModule: compiledModule,
+      skipTrustChecks: true
+    });
+
+    const pngHeader = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    const report = await validator.validateBytes(pngHeader, 'image/png');
+    expect(report.hasCredentials).toBe(false);
+    expect(report.badge).toBe('unsigned');
+    expect(report.mediaType).toBe('image/png');
+  });
 });
