@@ -21,7 +21,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TARGET_DIR="${SCRIPT_DIR}/../lib"
 
-VERSION="${1:-0.2.0}"
+VERSION="${1:-0.2.1}"
 VERSION="${VERSION#v}"
 
 REPO="ghchinoy/credentio-contributions"

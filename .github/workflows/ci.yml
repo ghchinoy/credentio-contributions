@@ -50,7 +50,7 @@ jobs:
 
       - name: Fetch prebuilt native library
         run: |
-          ./scripts/fetch-prebuilt-lib.sh 0.2.0
+          ./scripts/fetch-prebuilt-lib.sh 0.2.1
 
       - name: Run Go tests
         run: |
