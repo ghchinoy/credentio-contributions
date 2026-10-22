@@ -213,7 +213,19 @@ def _map_manifest(dict_: Dict[str, Any], default_label: str) -> Manifest:
         claim_generator = claim_dict.get("claim_generator") or dict_.get("claim_generator")
 
     # Signature
-    sig_dict = claim_dict.get("signature_info") or dict_.get("signature_info") or claim_dict.get("signature") or dict_.get("signature")
+    sig_dict = next(
+        (
+            cand
+            for cand in (
+                claim_dict.get("signature_info"),
+                dict_.get("signature_info"),
+                claim_dict.get("signature"),
+                dict_.get("signature"),
+            )
+            if isinstance(cand, dict)
+        ),
+        None,
+    )
     signature = None
     if isinstance(sig_dict, dict):
         issuer = sig_dict.get("issuer") or sig_dict.get("common_name")

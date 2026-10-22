@@ -14,7 +14,7 @@ To insulate downstream Python, Go, Swift, and WebAssembly applications from unex
 The repository root contains a `.credentio-pin` file containing the validated commit hash:
 
 ```text
-cdc4101b6fd26415a461f3de38f7b64ea995714e
+ee4078badeea5739b0f0f246dbaea7803382718b
 ```
 
 All build scripts (`scripts/build-shared-lib.sh`, `scripts/build-swift-xcframework.sh`, `scripts/build-wasm.sh`) and CI release workflows dynamically source this file when cloning upstream Credentio during automated builds.

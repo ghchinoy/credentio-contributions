@@ -266,11 +266,12 @@ function mapManifest(dict: any, defaultLabel: string): Manifest {
   }
 
   // Signature extraction
-  const sigDict =
-    claimDict?.signature_info ||
-    dict?.signature_info ||
-    claimDict?.signature ||
-    dict?.signature;
+  const sigDict = [
+    claimDict?.signature_info,
+    dict?.signature_info,
+    claimDict?.signature,
+    dict?.signature,
+  ].find((cand) => cand !== null && typeof cand === 'object' && !Array.isArray(cand));
   const signature = mapSignature(sigDict);
 
   // Assertions extraction

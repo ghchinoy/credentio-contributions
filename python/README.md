@@ -10,7 +10,7 @@ Pre-compiled binary wheels with bundled native libraries (macOS arm64 and Linux 
 
 ```bash
 # Download the matching wheel for your platform from GitHub Releases:
-pip install https://github.com/ghchinoy/credentio-contributions/releases/download/v0.2.0/credentio-0.2.0-cp311-cp311-macosx_11_0_arm64.whl
+pip install https://github.com/ghchinoy/credentio-contributions/releases/download/v0.2.1/credentio-0.2.1-cp311-cp311-macosx_11_0_arm64.whl
 ```
 
 > **Note:** Direct `pip install credentio` via PyPI is coming soon once Trusted Publishing is finalized.
@@ -45,7 +45,7 @@ with Signer(
     claim_signer_key_pem=key_pem,
     claim_signer_cert_pem=cert_pem,
     generator_name="MyPythonApp",
-    generator_version="0.2.0",
+    generator_version="0.2.1",
 ) as signer:
     res = signer.sign_file(
         "input.png",

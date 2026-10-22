@@ -10,7 +10,7 @@ Idiomatic `cgo` bindings for [Google Credentio](https://mediaprovenance.googleso
 
 1. Add the Go module dependency:
    ```bash
-   go get github.com/ghchinoy/credentio-contributions/go@v0.2.0
+   go get github.com/ghchinoy/credentio-contributions/go@v0.2.1
    ```
 2. Stage the prebuilt `libcredentio_c` shared library (macOS arm64 / Linux x86_64) or compile from source:
    ```bash
@@ -62,7 +62,7 @@ signer, err := credentio.NewSigner(
 	pki.ClaimSignerKeyPEM,
 	pki.ClaimSignerCertPEM,
 	credentio.WithTSACredentials(pki.TSAKeyPEM, pki.TSACertPEM),
-	credentio.WithGeneratorInfo("MyGoService", "0.2.0"),
+	credentio.WithGeneratorInfo("MyGoService", "0.2.1"),
 )
 if err != nil {
 	log.Fatal(err)

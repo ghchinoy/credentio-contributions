@@ -281,6 +281,9 @@ func mapManifest(dict map[string]interface{}, defaultLabel string) Manifest {
 		sigDict, _ = dict["signature_info"].(map[string]interface{})
 	}
 	if sigDict == nil {
+		sigDict, _ = claimDict["signature"].(map[string]interface{})
+	}
+	if sigDict == nil {
 		if s, ok := dict["signature"].(map[string]interface{}); ok {
 			sigDict = s
 		}

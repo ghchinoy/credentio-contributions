@@ -332,4 +332,51 @@ describe('parseCrJSON Parser Resilience', () => {
     expect(report.activeManifest?.validationStatuses.length).toBe(1);
     expect(report.activeManifest?.validationStatuses[0].code).toBe('hash.mismatch');
   });
+
+  it('extracts manifest signature when claim.v2.signature is a JUMBF URI string', () => {
+    const v2JumbfSig = JSON.stringify({
+      manifests: [
+        {
+          label: 'urn:c2pa:veo-3-1-lite-mp4',
+          'claim.v2': {
+            claim_generator_info: {
+              name: 'Google C2PA Core Generator Library',
+              version: '969395858:969395858'
+            },
+            instanceID: '3c9d9b36-4893-30c3-1ddd-4ef455a89d10',
+            signature: 'self#jumbf=c2pa.signature'
+          },
+          signature: {
+            algorithm: 'ES256',
+            certificateInfo: {
+              issuer: {
+                C: 'US',
+                CN: 'TESTING Google C2PA Qual Media Services ICA G1',
+                O: 'TESTING Google LLC'
+              },
+              serialNumber: 'ac047db08d82cb69298367b6ade5c7a987b75f'
+            },
+            timeStampInfo: {
+              timestamp: '2026-08-23T16:55:41+00:00'
+            }
+          },
+          validationResults: {
+            success: [{ code: 'claimSignature.validated' }]
+          }
+        }
+      ]
+    });
+
+    const report = parseCrJSON(v2JumbfSig, 'video/mp4');
+    expect(report.hasCredentials).toBe(true);
+    expect(report.badge).toBe('signed');
+    expect(report.activeManifest?.signature).toBeDefined();
+    expect(report.activeManifest?.signature?.issuer).toBe(
+      'TESTING Google C2PA Qual Media Services ICA G1'
+    );
+    expect(report.activeManifest?.signature?.algorithm).toBe('ES256');
+    expect(report.activeManifest?.signature?.certChainSummary).toBe(
+      'ac047db08d82cb69298367b6ade5c7a987b75f'
+    );
+  });
 });

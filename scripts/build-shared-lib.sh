@@ -22,7 +22,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 PIN_FILE="${REPO_DIR}/.credentio-pin"
-DEFAULT_SHA="cdc4101b6fd26415a461f3de38f7b64ea995714e"
+DEFAULT_SHA="ee4078badeea5739b0f0f246dbaea7803382718b"
 if [[ -f "${PIN_FILE}" ]]; then
   DEFAULT_SHA="$(tr -d '[:space:]' < "${PIN_FILE}")"
 fi

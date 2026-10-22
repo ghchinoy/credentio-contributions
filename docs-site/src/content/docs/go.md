@@ -14,7 +14,7 @@ The `github.com/ghchinoy/credentio-contributions/go` package provides native `cg
 Add the Go package to your `go.mod`:
 
 ```bash
-go get github.com/ghchinoy/credentio-contributions/go@v0.2.0
+go get github.com/ghchinoy/credentio-contributions/go@v0.2.1
 ```
 
 > **Note on Sub-module Versioning:** Release workflows automatically publish sub-module tags matching `go/vX.Y.Z` on GitHub, allowing standard `go get` commands to resolve without manual multi-module path replacement.

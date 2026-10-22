@@ -64,7 +64,7 @@ Because Credentio is developed at `HEAD`, clone the upstream repository alongsid
 # 1. Clone Google Credentio:
 git clone https://mediaprovenance.googlesource.com/credentio
 cd credentio
-git checkout cdc4101b6fd26415a461f3de38f7b64ea995714e
+git checkout ee4078badeea5739b0f0f246dbaea7803382718b
 cd ..
 
 # 2. Clone Credentio Contributions:
@@ -223,7 +223,7 @@ Install the package (or release tarball):
 ```bash
 npm install @ghchinoy/credentio-wasm
 # or from release tarball:
-# npm install https://github.com/ghchinoy/credentio-contributions/releases/download/v0.2.0/ghchinoy-credentio-wasm-0.2.0.tgz
+# npm install https://github.com/ghchinoy/credentio-contributions/releases/download/v0.2.1/ghchinoy-credentio-wasm-0.2.1.tgz
 ```
 
 Validate a media blob or file in TypeScript / JavaScript:
@@ -283,7 +283,7 @@ See the [CLI Tutorial](https://ghchinoy.github.io/credentio-contributions/cli/) 
 
 Pre-compiled binary releases and source packages are distributed across multiple package ecosystems:
 
-- **WebAssembly/TypeScript (@ghchinoy/credentio-wasm):** Pre-compiled single-threaded WebAssembly package and binaries attached to GitHub Releases (`ghchinoy-credentio-wasm-0.2.0.tgz`, `credentio.wasm`, `credentio.js`). npm registry publication will follow upstream coordination.
+- **WebAssembly/TypeScript (@ghchinoy/credentio-wasm):** Pre-compiled single-threaded WebAssembly package and binaries attached to GitHub Releases (`ghchinoy-credentio-wasm-0.2.1.tgz`, `credentio.wasm`, `credentio.js`). npm registry publication will follow upstream coordination.
 - **Swift (CredentioKit):** Swift Package Manager remote binary package linking pre-compiled `CredentioC.xcframework` (macOS arm64 prebuilt today; iOS and universal binaries build from source).
 - **Python (credentio):** Pre-compiled binary wheels attached to GitHub Releases (macOS arm64 and Linux x86_64). PyPI registry publication is coming soon.
 - **Go:** Standard Go module with automated prebuilt library download via `make fetch-lib` (macOS arm64 and Linux x86_64) or direct compilation from source.

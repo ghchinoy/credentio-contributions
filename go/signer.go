@@ -103,7 +103,7 @@ func NewSigner(claimSignerKeyPEM, claimSignerCertPEM string, opts ...SignerOptio
 
 	cfg := signerOptions{
 		generatorName:    "Credentio",
-		generatorVersion: "0.2.0",
+		generatorVersion: "0.2.1",
 	}
 	for _, opt := range opts {
 		opt(&cfg)

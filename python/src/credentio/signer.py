@@ -49,7 +49,7 @@ class Signer:
         tsa_key_pem: Optional[str] = None,
         tsa_cert_pem: Optional[str] = None,
         generator_name: str = "Credentio",
-        generator_version: str = "0.2.0",
+        generator_version: str = "0.2.1",
     ):
         if not claim_signer_key_pem or not claim_signer_cert_pem:
             raise ValueError("claim_signer_key_pem and claim_signer_cert_pem are required.")

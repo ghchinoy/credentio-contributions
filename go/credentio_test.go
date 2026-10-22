@@ -294,7 +294,8 @@ func TestParseCrJSON_PortlandiaProbeMP4(t *testing.T) {
 						"name": "Google C2PA Core Generator Library",
 						"version": "969395858:969395858"
 					},
-					"instanceID": "3c9d9b36-4893-30c3-1ddd-4ef455a89d10"
+					"instanceID": "3c9d9b36-4893-30c3-1ddd-4ef455a89d10",
+					"signature": "self#jumbf=c2pa.signature"
 				},
 				"signature": {
 					"algorithm": "ES256",

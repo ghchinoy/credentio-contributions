@@ -584,7 +584,7 @@ cr_signer* cr_signer_create(
   s->generator_name =
       (generator_name && strlen(generator_name) > 0) ? generator_name : "Credentio";
   s->generator_version =
-      (generator_version && strlen(generator_version) > 0) ? generator_version : "0.2.0";
+      (generator_version && strlen(generator_version) > 0) ? generator_version : "0.2.1";
 
   // Validate that the key and certificate chain can initialize a write handler
   auto test_handler = credentio::CreateLocalKeyCryptoWriteHandler(s->crypto_options);
@@ -761,7 +761,7 @@ void cr_bytes_free(uint8_t* bytes) {
 }
 
 const char* cr_version(void) {
-  return "0.2.0-credentio-c";
+  return "0.2.1-credentio-c";
 }
 
 }  // extern "C"

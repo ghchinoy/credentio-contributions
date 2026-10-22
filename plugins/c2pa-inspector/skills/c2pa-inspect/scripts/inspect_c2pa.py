@@ -186,7 +186,21 @@ def parse_crjson(
             generator = claim.get("claim_generator") or claim.get("claimGenerator")
 
         # Signature resolution
-        sig_info = claim.get("signature_info", {}) or claim.get("signatureInfo", {})
+        sig_info = next(
+            (
+                cand
+                for cand in (
+                    claim.get("signature_info"),
+                    claim.get("signatureInfo"),
+                    m.get("signature_info"),
+                    m.get("signatureInfo"),
+                    claim.get("signature"),
+                    m.get("signature"),
+                )
+                if isinstance(cand, dict)
+            ),
+            {},
+        )
         issuer = sig_info.get("issuer")
         if isinstance(issuer, dict):
             issuer = issuer.get("CN") or issuer.get("commonName")

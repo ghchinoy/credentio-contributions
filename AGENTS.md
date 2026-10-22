@@ -117,7 +117,7 @@ make clean
    - **Commit 1 (Pre-Release Version Bump & Tag):** Update version strings in `native/credentio_c.cc`, `python/pyproject.toml`, `python/src/credentio/__init__.py`, `go/cmd/credentio/main.go`, `swift/Sources/credentio-cli/CredentioCLI.swift`, `wasm/package.json`, and documentation. Keep `swift/Package.swift` and `scripts/fetch-prebuilt-lib.sh` pointing to the *previous* release until the new release finishes building. Commit, push `main`, and push tags `vX.Y.Z` and `go/vX.Y.Z` to trigger `.github/workflows/release.yml`.
    - **Commit 2 (Post-Release Asset Pinning):** Once `release.yml` publishes the `vX.Y.Z` assets, fetch `CredentioC.xcframework.zip.sha256` from the release and update `swift/Package.swift` (`releaseVersion` + `remoteChecksum`), `scripts/fetch-prebuilt-lib.sh`, `plugins/c2pa-inspector/skills/c2pa-inspect/scripts/fetch_native_lib.sh`, and `.github/workflows/ci.yml`.
 5. **Upstream Commit Pinning & Drift Detection:**
-   Build scripts source the authoritative commit from `.credentio-pin` (baseline: `cdc4101b6fd26415a461f3de38f7b64ea995714e`). Run `make check-drift` or trigger the scheduled `drift-check.yml` workflow to detect upstream movement prior to bumping the baseline.
+   Build scripts source the authoritative commit from `.credentio-pin` (baseline: `ee4078badeea5739b0f0f246dbaea7803382718b`). Run `make check-drift` or trigger the scheduled `drift-check.yml` workflow to detect upstream movement prior to bumping the baseline.
 6. **Architecture Decisions:**
    Substantial architectural choices, FFI changes, or engine models must be recorded as Architecture Decision Records in `docs/adr/`.
 7. **CGO Dynamic Linking and Runtime RPATH:**
@@ -138,4 +138,3 @@ make clean
 12. **Starlight Markdown Conventions & `npm ci` Lockfile Sync:**
     - Never include a top-level `# H1` in `docs-site/src/content/docs/*.{md,mdx}` body content because Starlight renders the frontmatter `title` as the page's `<h1>`.
     - When updating `docs-site/package.json` (especially with `"overrides"`), always run `cd docs-site && npm install && npm ci` locally before committing `package-lock.json` so GitHub Actions' `npm ci` step stays in sync.
-

@@ -40,8 +40,8 @@ Cloudflare Workers blocks runtime WebAssembly compilation from raw byte arrays (
 mkdir credentio-cf-worker && cd credentio-cf-worker
 npm init -y
 
-# Install @ghchinoy/credentio-wasm from the v0.2.0 GitHub Release tarball:
-npm install https://github.com/ghchinoy/credentio-contributions/releases/download/v0.2.0/ghchinoy-credentio-wasm-0.2.0.tgz
+# Install @ghchinoy/credentio-wasm from the v0.2.1 GitHub Release tarball:
+npm install https://github.com/ghchinoy/credentio-contributions/releases/download/v0.2.1/ghchinoy-credentio-wasm-0.2.1.tgz
 
 # Install Cloudflare Wrangler and TypeScript types:
 npm install -D wrangler @cloudflare/workers-types typescript
