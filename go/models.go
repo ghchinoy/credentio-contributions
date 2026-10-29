@@ -138,7 +138,20 @@ func (r *ProvenanceReport) Badge() BadgeState {
 
 func classifySeverity(code string) Severity {
 	lowered := strings.ToLower(code)
-	for _, keyword := range []string{"not", "invalid", "mismatch", "missing", "untrusted", "fail", "error"} {
+	for _, keyword := range []string{
+		"not",
+		"invalid",
+		"mismatch",
+		"missing",
+		"untrusted",
+		"unsupported",
+		"malformed",
+		"revoked",
+		"expired",
+		"rejected",
+		"fail",
+		"error",
+	} {
 		if strings.Contains(lowered, keyword) {
 			return SeverityError
 		}
@@ -196,16 +209,7 @@ func ParseCrJSON(rawJSON, mediaType string, elapsedSeconds, coreSeconds float64)
 		}
 	}
 
-	specVersion := ""
-	if sv, ok := root["spec_version"].(string); ok {
-		specVersion = sv
-	} else if vr, ok := root["validation_results"].(map[string]interface{}); ok {
-		if sv, ok := vr["spec_version"].(string); ok {
-			specVersion = sv
-		} else if v, ok := vr["version"].(string); ok {
-			specVersion = v
-		}
-	}
+	specVersion := extractSpecVersion(root)
 
 	return &ProvenanceReport{
 		EngineID:            "credentio",
@@ -219,6 +223,55 @@ func ParseCrJSON(rawJSON, mediaType string, elapsedSeconds, coreSeconds float64)
 		IngredientManifests: ingredients,
 		RawJSON:             rawJSON,
 	}, nil
+}
+
+func extractSpecVersion(root map[string]interface{}) string {
+	for _, key := range []string{"spec_version", "specVersion"} {
+		if sv, ok := root[key].(string); ok && sv != "" {
+			return sv
+		}
+	}
+	for _, vrKey := range []string{"validation_results", "validationResults"} {
+		if vr, ok := root[vrKey].(map[string]interface{}); ok {
+			for _, key := range []string{"spec_version", "specVersion", "version"} {
+				if sv, ok := vr[key].(string); ok && sv != "" {
+					return sv
+				}
+			}
+		}
+	}
+	var firstManifest map[string]interface{}
+	if rawList, ok := root["manifests"].([]interface{}); ok && len(rawList) > 0 {
+		firstManifest, _ = rawList[0].(map[string]interface{})
+	} else if rawDict, ok := root["manifests"].(map[string]interface{}); ok {
+		for _, item := range rawDict {
+			if mDict, ok := item.(map[string]interface{}); ok {
+				firstManifest = mDict
+				break
+			}
+		}
+	}
+	if firstManifest != nil {
+		for _, vrKey := range []string{"validationResults", "validation_results"} {
+			if vr, ok := firstManifest[vrKey].(map[string]interface{}); ok {
+				for _, key := range []string{"specVersion", "spec_version", "version"} {
+					if sv, ok := vr[key].(string); ok && sv != "" {
+						return sv
+					}
+				}
+			}
+		}
+		for _, claimKey := range []string{"claim.v2", "claim"} {
+			if claim, ok := firstManifest[claimKey].(map[string]interface{}); ok {
+				for _, key := range []string{"specVersion", "spec_version"} {
+					if sv, ok := claim[key].(string); ok && sv != "" {
+						return sv
+					}
+				}
+			}
+		}
+	}
+	return ""
 }
 
 func mapManifest(dict map[string]interface{}, defaultLabel string) Manifest {
@@ -241,6 +294,13 @@ func mapManifest(dict map[string]interface{}, defaultLabel string) Manifest {
 			claimDict = c2
 		} else {
 			claimDict = make(map[string]interface{})
+		}
+	}
+	if title == "" {
+		if dct, ok := claimDict["dc:title"].(string); ok && dct != "" {
+			title = dct
+		} else if ct, ok := claimDict["title"].(string); ok && ct != "" {
+			title = ct
 		}
 	}
 

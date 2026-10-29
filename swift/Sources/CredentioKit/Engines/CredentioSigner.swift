@@ -70,7 +70,7 @@ public actor CredentioSigner {
         tsaKeyPEM: String? = nil,
         tsaCertPEM: String? = nil,
         generatorName: String = "CredentioKit",
-        generatorVersion: String = "0.2.1"
+        generatorVersion: String = "0.2.2"
     ) throws {
         #if canImport(CredentioC)
         let rawPtr = claimSignerKeyPEM.withCString { keyCStr in

@@ -178,8 +178,16 @@ absl::StatusOr<std::string> ValidateReaderAndGenerateCrJson(
     return absl::InvalidArgumentError("Media type could not be determined");
   }
 
+  std::optional<absl::string_view> validator_media_type = media_type_opt;
+  if (*validator_media_type == "application/zip") {
+    // Credentio's CreateZipFormat registers OOXML MIME types (.docx, .pptx, .xlsx)
+    // rather than "application/zip"; passing std::nullopt lets FormatRegistry::GetFormat(reader)
+    // match via ZipAssessor::IsSupported(reader).
+    validator_media_type = std::nullopt;
+  }
+
   const auto start_time = std::chrono::high_resolution_clock::now();
-  const auto result_status = v->validator->Validate(reader, media_type_opt);
+  const auto result_status = v->validator->Validate(reader, validator_media_type);
   const auto end_time = std::chrono::high_resolution_clock::now();
 
   const std::chrono::duration<double> diff = end_time - start_time;
@@ -457,12 +465,14 @@ char* cr_validate_file(
     resolved_media_type = media_type;
   } else {
     auto sniffed = SniffMediaType(reader);
-    if (sniffed.has_value()) {
+    if (sniffed.has_value() && *sniffed != "application/zip") {
       resolved_media_type = std::move(sniffed);
     } else {
       auto mt = credentio::MediaType(file_path);
       if (mt.ok()) {
         resolved_media_type = *mt;
+      } else if (sniffed.has_value()) {
+        resolved_media_type = std::move(sniffed);
       }
     }
   }
@@ -584,7 +594,7 @@ cr_signer* cr_signer_create(
   s->generator_name =
       (generator_name && strlen(generator_name) > 0) ? generator_name : "Credentio";
   s->generator_version =
-      (generator_version && strlen(generator_version) > 0) ? generator_version : "0.2.1";
+      (generator_version && strlen(generator_version) > 0) ? generator_version : "0.2.2";
 
   // Validate that the key and certificate chain can initialize a write handler
   auto test_handler = credentio::CreateLocalKeyCryptoWriteHandler(s->crypto_options);
@@ -761,7 +771,7 @@ void cr_bytes_free(uint8_t* bytes) {
 }
 
 const char* cr_version(void) {
-  return "0.2.1-credentio-c";
+  return "0.2.2-credentio-c";
 }
 
 }  // extern "C"

@@ -31,7 +31,7 @@ export interface SignerOptions extends WasmInitOptions {
   tsaCertPem?: string;
   /** Claim generator software name (defaults to `'Credentio (WebAssembly)'`). */
   generatorName?: string;
-  /** Claim generator software version (defaults to `'0.2.1'`). */
+  /** Claim generator software version (defaults to `'0.2.2'`). */
   generatorVersion?: string;
 }
 
@@ -110,7 +110,7 @@ export class CredentioSigner {
     const tsaKeyPtr = allocCString(options.tsaKeyPem);
     const tsaCertPtr = allocCString(options.tsaCertPem);
     const genNamePtr = allocCString(options.generatorName ?? 'Credentio (WebAssembly)');
-    const genVerPtr = allocCString(options.generatorVersion ?? '0.2.1');
+    const genVerPtr = allocCString(options.generatorVersion ?? '0.2.2');
 
     try {
       const signerPtr = wasmModule._cr_signer_create(

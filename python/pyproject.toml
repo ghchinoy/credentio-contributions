@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=75.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "credentio"
-version = "0.2.1"
+version = "0.2.2"
 description = "Python bindings for Google Credentio C2PA Content Credentials validator"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -23,16 +23,18 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Multimedia :: Graphics",
     "Topic :: Security :: Cryptography",
 ]
 dependencies = [
-    "cffi>=1.15.0",
+    "cffi>=1.17.1",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=7.0",
+    "pytest>=8.0",
 ]
 
 [project.scripts]

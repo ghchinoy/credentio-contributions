@@ -52,6 +52,11 @@ function classifySeverity(code: string): Severity {
     lowered.includes('invalid') ||
     lowered.includes('mismatch') ||
     lowered.includes('missing') ||
+    lowered.includes('unsupported') ||
+    lowered.includes('malformed') ||
+    lowered.includes('revoked') ||
+    lowered.includes('expired') ||
+    lowered.includes('rejected') ||
     lowered.includes('fail') ||
     lowered.includes('error')
   ) {
@@ -241,11 +246,11 @@ function mapValidationStatuses(array: any[], category?: string): ValidationStatu
  */
 function mapManifest(dict: any, defaultLabel: string): Manifest {
   const label = (dict && dict.label) ? String(dict.label) : defaultLabel;
-  const title = dict?.title ? String(dict.title) : undefined;
-  const format = dict?.format ? String(dict.format) : undefined;
-  const isUpdateManifest = Boolean(dict?.is_update_manifest);
-
   const claimDict = dict?.claim || dict?.['claim.v2'] || {};
+  const rawTitle = dict?.title ?? claimDict?.['dc:title'] ?? claimDict?.title;
+  const title = rawTitle ? String(rawTitle) : undefined;
+  const format = dict?.format ? String(dict.format) : undefined;
+  const isUpdateManifest = Boolean(dict?.is_update_manifest ?? dict?.isUpdateManifest);
 
   // Claim generator extraction
   let claimGenerator: string | undefined;
@@ -448,11 +453,31 @@ export function parseCrJSON(
     }
   }
 
-  const valResults = root.validation_results || {};
+  const valResults = root.validation_results || root.validationResults || {};
+  let firstRawManifest: any;
+  if (Array.isArray(rawManifests) && rawManifests.length > 0) {
+    firstRawManifest = rawManifests[0];
+  } else if (rawManifests && typeof rawManifests === 'object') {
+    const values = Object.values(rawManifests);
+    if (values.length > 0) {
+      firstRawManifest = values[0];
+    }
+  }
+  const firstManifestValResults =
+    firstRawManifest?.validationResults || firstRawManifest?.validation_results || {};
+  const firstManifestClaim =
+    firstRawManifest?.['claim.v2'] || firstRawManifest?.claim || {};
   const specVersion =
     root.spec_version ||
+    root.specVersion ||
     valResults.spec_version ||
+    valResults.specVersion ||
     valResults.version ||
+    firstManifestValResults.specVersion ||
+    firstManifestValResults.spec_version ||
+    firstManifestValResults.version ||
+    firstManifestClaim.specVersion ||
+    firstManifestClaim.spec_version ||
     undefined;
 
   return createProvenanceReport({

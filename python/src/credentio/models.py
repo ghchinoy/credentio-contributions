@@ -113,11 +113,64 @@ class ProvenanceReport:
 
 def _classify_severity(code: str) -> Severity:
     lowered = code.lower()
-    if any(k in lowered for k in ("not", "invalid", "mismatch", "missing", "untrusted", "fail", "error")):
+    if any(
+        k in lowered
+        for k in (
+            "not",
+            "invalid",
+            "mismatch",
+            "missing",
+            "untrusted",
+            "unsupported",
+            "malformed",
+            "revoked",
+            "expired",
+            "rejected",
+            "fail",
+            "error",
+        )
+    ):
         return Severity.ERROR
     if any(k in lowered for k in ("validated", "trusted", "success", "ok")):
         return Severity.INFO
     return Severity.WARNING
+
+
+def _extract_spec_version(root: Dict[str, Any], raw_manifests: Any) -> Optional[str]:
+    val_results = root.get("validation_results") if isinstance(root.get("validation_results"), dict) else {}
+    val_results_v2 = root.get("validationResults") if isinstance(root.get("validationResults"), dict) else {}
+    spec_version = (
+        root.get("spec_version")
+        or root.get("specVersion")
+        or val_results.get("spec_version")
+        or val_results.get("specVersion")
+        or val_results.get("version")
+        or val_results_v2.get("specVersion")
+        or val_results_v2.get("spec_version")
+    )
+    if spec_version:
+        return str(spec_version)
+
+    first_manifest: Optional[Dict[str, Any]] = None
+    if isinstance(raw_manifests, list) and raw_manifests and isinstance(raw_manifests[0], dict):
+        first_manifest = raw_manifests[0]
+    elif isinstance(raw_manifests, dict) and raw_manifests:
+        first_val = next(iter(raw_manifests.values()))
+        if isinstance(first_val, dict):
+            first_manifest = first_val
+
+    if isinstance(first_manifest, dict):
+        m_val_res = first_manifest.get("validationResults")
+        if isinstance(m_val_res, dict):
+            sv = m_val_res.get("specVersion") or m_val_res.get("spec_version")
+            if sv:
+                return str(sv)
+        m_claim = first_manifest.get("claim.v2") or first_manifest.get("claim")
+        if isinstance(m_claim, dict):
+            sv = m_claim.get("specVersion") or m_claim.get("spec_version")
+            if sv:
+                return str(sv)
+    return None
 
 
 def parse_crjson(
@@ -162,8 +215,7 @@ def parse_crjson(
     active = manifests[0] if manifests else None
     ingredients = manifests[1:] if len(manifests) > 1 else []
 
-    val_results = root.get("validation_results", {})
-    spec_version = root.get("spec_version") or val_results.get("spec_version") or val_results.get("version")
+    spec_version = _extract_spec_version(root, raw_manifests)
 
     return ProvenanceReport(
         engine_id=engine_id,
@@ -190,11 +242,14 @@ def _clean_generator_version(ver: Optional[str]) -> Optional[str]:
 
 def _map_manifest(dict_: Dict[str, Any], default_label: str) -> Manifest:
     label = dict_.get("label", default_label)
-    title = dict_.get("title")
     format_ = dict_.get("format")
-    is_update = dict_.get("is_update_manifest", False)
+    is_update = bool(dict_.get("is_update_manifest", dict_.get("isUpdateManifest", False)))
 
     claim_dict = dict_.get("claim") or dict_.get("claim.v2") or {}
+    if not isinstance(claim_dict, dict):
+        claim_dict = {}
+
+    title = dict_.get("title") or claim_dict.get("dc:title") or claim_dict.get("title")
 
     # Generator extraction
     claim_generator = None

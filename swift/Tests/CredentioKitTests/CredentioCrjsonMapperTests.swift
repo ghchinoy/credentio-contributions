@@ -357,6 +357,59 @@ final class CredentioCrjsonMapperTests: XCTestCase {
         XCTAssertEqual(active.signature?.issuer, "TESTING Google C2PA Qual Media Services ICA G1")
     }
 
+    func testUpstreamSpecVersionAndStatusCodes() {
+        let rawPayload = """
+        {
+            "@context": ["https://c2pa.org/crjson/crJSON.schema.json"],
+            "jsonGenerator": {"name": "Google C2PA Toolkit", "version": "0.0.1"},
+            "manifests": [
+                {
+                    "label": "urn:c2pa:upstream-crjson-alignment",
+                    "isUpdateManifest": true,
+                    "claim.v2": {
+                        "dc:title": "OOXML Signed Presentation",
+                        "specVersion": "2.2",
+                        "claim_generator_info": {
+                            "name": "CredentioOffice",
+                            "version": "1.0.0"
+                        }
+                    },
+                    "validation": {
+                        "status": [
+                            {
+                                "code": "algorithm.unsupported",
+                                "explanation": "Signature algorithm is not supported."
+                            }
+                        ]
+                    },
+                    "validationResults": {
+                        "specVersion": "2.2"
+                    }
+                }
+            ]
+        }
+        """
+
+        let report = CredentioCrjsonMapper.mapReport(
+            json: rawPayload,
+            mediaType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            elapsed: .zero
+        )
+
+        XCTAssertTrue(report.hasCredentials)
+        XCTAssertEqual(report.specVersion, "2.2")
+        XCTAssertEqual(report.badge, .invalid)
+        guard let active = report.activeManifest else {
+            XCTFail("Missing active manifest")
+            return
+        }
+        XCTAssertEqual(active.title, "OOXML Signed Presentation")
+        XCTAssertTrue(active.isUpdateManifest)
+        XCTAssertEqual(active.validationStatuses.count, 1)
+        XCTAssertEqual(active.validationStatuses.first?.code, "algorithm.unsupported")
+        XCTAssertEqual(active.validationStatuses.first?.severity, .error)
+    }
+
     func testNativeSignAndValidateRoundTrip() async throws {
         guard CredentioNativeEngine.isAvailable else {
             throw XCTSkip("CredentioC native framework not available")

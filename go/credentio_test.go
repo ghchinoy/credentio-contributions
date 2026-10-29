@@ -394,6 +394,71 @@ func TestParseCrJSON_PortlandiaProbeMP4(t *testing.T) {
 	}
 }
 
+func TestParseCrJSON_UpstreamSpecVersionAndStatusCodes(t *testing.T) {
+	const rawPayload = `
+	{
+		"@context": ["https://c2pa.org/crjson/crJSON.schema.json"],
+		"jsonGenerator": {"name": "Google C2PA Toolkit", "version": "0.0.1"},
+		"manifests": [
+			{
+				"label": "urn:c2pa:upstream-crjson-alignment",
+				"isUpdateManifest": true,
+				"claim.v2": {
+					"dc:title": "OOXML Signed Presentation",
+					"specVersion": "2.2",
+					"claim_generator_info": {
+						"name": "CredentioOffice",
+						"version": "1.0.0"
+					}
+				},
+				"validation": {
+					"status": [
+						{
+							"code": "algorithm.unsupported",
+							"explanation": "Signature algorithm is not supported."
+						}
+					]
+				},
+				"validationResults": {
+					"specVersion": "2.2"
+				}
+			}
+		]
+	}
+	`
+	report, err := ParseCrJSON(
+		rawPayload,
+		"application/vnd.openxmlformats-officedocument.presentationml.presentation",
+		0.004,
+		0.002,
+	)
+	if err != nil {
+		t.Fatalf("unexpected error parsing crJSON: %v", err)
+	}
+	if !report.HasCredentials {
+		t.Fatalf("expected HasCredentials to be true")
+	}
+	if report.SpecVersion != "2.2" {
+		t.Errorf("expected SpecVersion '2.2', got %q", report.SpecVersion)
+	}
+	if report.Badge() != BadgeInvalid {
+		t.Errorf("expected BadgeInvalid for algorithm.unsupported, got %q", report.Badge())
+	}
+	active := report.ActiveManifest
+	if active == nil {
+		t.Fatalf("expected ActiveManifest not to be nil")
+	}
+	if active.Title != "OOXML Signed Presentation" {
+		t.Errorf("expected Title 'OOXML Signed Presentation', got %q", active.Title)
+	}
+	if !active.IsUpdateManifest {
+		t.Errorf("expected IsUpdateManifest to be true")
+	}
+	if len(active.ValidationStatuses) != 1 || active.ValidationStatuses[0].Severity != SeverityError {
+		t.Errorf("expected algorithm.unsupported to have SeverityError, got %+v", active.ValidationStatuses)
+	}
+}
+
 func TestSniffMediaType(t *testing.T) {
 	tests := []struct {
 		header   []byte

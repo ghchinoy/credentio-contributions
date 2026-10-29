@@ -223,6 +223,55 @@ def test_portlandia_probe_mp4():
     assert active.signature.issuer == "TESTING Google C2PA Qual Media Services ICA G1"
 
 
+def test_upstream_crjson_manifest_spec_version_and_status_codes():
+    raw_payload = """
+    {
+        "@context": ["https://c2pa.org/crjson/crJSON.schema.json"],
+        "jsonGenerator": {"name": "Google C2PA Toolkit", "version": "0.0.1"},
+        "manifests": [
+            {
+                "label": "urn:c2pa:upstream-crjson-alignment",
+                "isUpdateManifest": true,
+                "claim.v2": {
+                    "dc:title": "OOXML Signed Presentation",
+                    "specVersion": "2.2",
+                    "claim_generator_info": {
+                        "name": "CredentioOffice",
+                        "version": "1.0.0"
+                    }
+                },
+                "validation": {
+                    "status": [
+                        {
+                            "code": "algorithm.unsupported",
+                            "explanation": "Signature algorithm is not supported."
+                        }
+                    ]
+                },
+                "validationResults": {
+                    "specVersion": "2.2"
+                }
+            }
+        ]
+    }
+    """
+    report = parse_crjson(
+        raw_json=raw_payload,
+        media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    )
+    assert report.has_credentials is True
+    assert report.spec_version == "2.2"
+    assert report.badge == BadgeState.INVALID
+
+    active = report.active_manifest
+    assert active is not None
+    assert active.title == "OOXML Signed Presentation"
+    assert active.is_update_manifest is True
+    assert len(active.validation_statuses) == 1
+    assert active.validation_statuses[0].code == "algorithm.unsupported"
+    assert active.validation_statuses[0].severity == Severity.ERROR
+
+
 def test_sniff_media_type():
     from credentio.validator import sniff_media_type
     assert sniff_media_type(b"ID3\x03\x00\x00\x00\x00;jGEOB") == "audio/mpeg"

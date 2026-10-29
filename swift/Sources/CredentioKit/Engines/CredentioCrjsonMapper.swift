@@ -97,10 +97,7 @@ public enum CredentioCrjsonMapper {
             }
         }
 
-        let validationResults = root["validation_results"] as? [String: Any]
-        let specVersion = root["spec_version"] as? String
-            ?? validationResults?["spec_version"] as? String
-            ?? validationResults?["version"] as? String
+        let specVersion = extractSpecVersion(from: root)
 
         return ProvenanceReport(
             engineID: engineID,
@@ -116,14 +113,62 @@ public enum CredentioCrjsonMapper {
         )
     }
 
+    private static func extractSpecVersion(from root: [String: Any]) -> String? {
+        if let sv = (root["spec_version"] as? String) ?? (root["specVersion"] as? String), !sv.isEmpty {
+            return sv
+        }
+        for vrKey in ["validation_results", "validationResults"] {
+            if let vr = root[vrKey] as? [String: Any] {
+                if let sv = (vr["spec_version"] as? String) ?? (vr["specVersion"] as? String) ?? (vr["version"] as? String),
+                   !sv.isEmpty {
+                    return sv
+                }
+            }
+        }
+        var firstManifest: [String: Any]?
+        if let manifestsArray = root["manifests"] as? [[String: Any]] {
+            firstManifest = manifestsArray.first
+        } else if let manifestsDict = root["manifests"] as? [String: Any] {
+            for (_, value) in manifestsDict {
+                if let dict = value as? [String: Any] {
+                    firstManifest = dict
+                    break
+                }
+            }
+        }
+        if let firstManifest {
+            for vrKey in ["validationResults", "validation_results"] {
+                if let vr = firstManifest[vrKey] as? [String: Any] {
+                    if let sv = (vr["specVersion"] as? String) ?? (vr["spec_version"] as? String) ?? (vr["version"] as? String),
+                       !sv.isEmpty {
+                        return sv
+                    }
+                }
+            }
+            for claimKey in ["claim.v2", "claim"] {
+                if let claim = firstManifest[claimKey] as? [String: Any] {
+                    if let sv = (claim["specVersion"] as? String) ?? (claim["spec_version"] as? String),
+                       !sv.isEmpty {
+                        return sv
+                    }
+                }
+            }
+        }
+        return nil
+    }
+
     private static func mapManifest(dict: [String: Any], defaultLabel: String) -> Manifest {
         let label = dict["label"] as? String ?? defaultLabel
-        let title = dict["title"] as? String
         let format = dict["format"] as? String
-        let isUpdateManifest = dict["is_update_manifest"] as? Bool ?? false
+        let isUpdateManifest = (dict["is_update_manifest"] as? Bool)
+            ?? (dict["isUpdateManifest"] as? Bool)
+            ?? false
 
         let claimDict = (dict["claim"] as? [String: Any])
             ?? (dict["claim.v2"] as? [String: Any])
+        let title = (dict["title"] as? String)
+            ?? (claimDict?["dc:title"] as? String)
+            ?? (claimDict?["title"] as? String)
 
         // Claim generator extraction
         var claimGenerator: String?
@@ -331,6 +376,11 @@ public enum CredentioCrjsonMapper {
             || lowered.contains("invalid")
             || lowered.contains("mismatch")
             || lowered.contains("missing")
+            || lowered.contains("unsupported")
+            || lowered.contains("malformed")
+            || lowered.contains("revoked")
+            || lowered.contains("expired")
+            || lowered.contains("rejected")
             || lowered.contains("fail")
             || lowered.contains("error") {
             return .error

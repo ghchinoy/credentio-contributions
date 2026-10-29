@@ -74,7 +74,7 @@ Install the package using your preferred package manager (or install directly fr
 ```bash
 npm install @ghchinoy/credentio-wasm
 # or install from release tarball:
-# npm install https://github.com/ghchinoy/credentio-contributions/releases/download/v0.2.1/ghchinoy-credentio-wasm-0.2.1.tgz
+# npm install https://github.com/ghchinoy/credentio-contributions/releases/download/v0.2.2/ghchinoy-credentio-wasm-0.2.2.tgz
 ```
 
 ---
@@ -149,7 +149,7 @@ using signer = await CredentioSigner.create({
   claimSignerKeyPem,
   claimSignerCertPem,
   generatorName: 'MyWebStudio',
-  generatorVersion: '0.2.1',
+  generatorVersion: '0.2.2',
 });
 
 const { signedBytes, coreSeconds } = await signer.signBytes(imageBytes, {

@@ -379,4 +379,52 @@ describe('parseCrJSON Parser Resilience', () => {
       'ac047db08d82cb69298367b6ade5c7a987b75f'
     );
   });
+
+  it('extracts per-manifest specVersion, dc:title, isUpdateManifest, and classifies algorithm.unsupported as error', () => {
+    const upstreamPayload = JSON.stringify({
+      '@context': ['https://c2pa.org/crjson/crJSON.schema.json'],
+      jsonGenerator: { name: 'Google C2PA Toolkit', version: '0.0.1' },
+      manifests: [
+        {
+          label: 'urn:c2pa:upstream-crjson-alignment',
+          isUpdateManifest: true,
+          'claim.v2': {
+            'dc:title': 'OOXML Signed Presentation',
+            specVersion: '2.2',
+            claim_generator_info: {
+              name: 'CredentioOffice',
+              version: '1.0.0'
+            }
+          },
+          validation: {
+            status: [
+              {
+                code: 'algorithm.unsupported',
+                explanation: 'Signature algorithm is not supported.'
+              }
+            ]
+          },
+          validationResults: {
+            specVersion: '2.2'
+          }
+        }
+      ]
+    });
+
+    const report = parseCrJSON(
+      upstreamPayload,
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+    );
+    expect(report.hasCredentials).toBe(true);
+    expect(report.specVersion).toBe('2.2');
+    expect(report.badge).toBe('invalid');
+    expect(report.isInvalid).toBe(true);
+
+    const active = report.activeManifest;
+    expect(active?.title).toBe('OOXML Signed Presentation');
+    expect(active?.isUpdateManifest).toBe(true);
+    expect(active?.validationStatuses.length).toBe(1);
+    expect(active?.validationStatuses[0].code).toBe('algorithm.unsupported');
+    expect(active?.validationStatuses[0].severity).toBe('error');
+  });
 });

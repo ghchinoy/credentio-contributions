@@ -24,7 +24,7 @@ Add `CredentioKit` to your dependencies in `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/ghchinoy/credentio-contributions.git", from: "0.2.1")
+    .package(url: "https://github.com/ghchinoy/credentio-contributions.git", from: "0.2.2")
 ],
 targets: [
     .target(
@@ -83,7 +83,7 @@ let signer = try CredentioSigner(
     claimSignerKeyPEM: keyPEM,
     claimSignerCertPEM: certPEM,
     generatorName: "MyMacApp",
-    generatorVersion: "0.2.1"
+    generatorVersion: "0.2.2"
 )
 let signRes = try await signer.sign(
     inputURL: URL(fileURLWithPath: "input.png"),

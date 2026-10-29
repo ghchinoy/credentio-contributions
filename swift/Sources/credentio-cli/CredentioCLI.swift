@@ -21,7 +21,7 @@ struct CredentioCLI: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "credentio-cli",
         abstract: "Google Credentio C2PA Content Credentials Command-Line Validator & Signer",
-        version: "0.2.1",
+        version: "0.2.2",
         subcommands: [Validate.self, Sign.self],
         defaultSubcommand: Validate.self
     )
@@ -82,7 +82,7 @@ struct Sign: AsyncParsableCommand {
                 tsaKeyPEM: tsaKeyPEM,
                 tsaCertPEM: tsaCertPEM,
                 generatorName: generator,
-                generatorVersion: "0.2.1"
+                generatorVersion: "0.2.2"
             )
 
             let res = try await signer.sign(

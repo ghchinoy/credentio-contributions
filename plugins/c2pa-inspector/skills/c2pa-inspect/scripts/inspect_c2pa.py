@@ -158,20 +158,30 @@ def parse_crjson(
 
     spec_version = (
         data.get("spec_version") or
+        data.get("specVersion") or
         val_results.get("spec_version") or
         val_results.get("specVersion")
     )
+    if not spec_version and isinstance(manifests_raw, list) and manifests_raw:
+        first_m = manifests_raw[0] if isinstance(manifests_raw[0], dict) else {}
+        first_vr = first_m.get("validationResults") or first_m.get("validation_results") or {}
+        first_claim = first_m.get("claim.v2") or first_m.get("claim") or {}
+        if isinstance(first_vr, dict):
+            spec_version = first_vr.get("specVersion") or first_vr.get("spec_version")
+        if not spec_version and isinstance(first_claim, dict):
+            spec_version = first_claim.get("specVersion") or first_claim.get("spec_version")
     media_type = media_type or data.get("media_type") or val_results.get("media_type")
 
     manifest_objs: List[Manifest] = []
 
     for m in manifests_raw:
         label = m.get("label", "urn:c2pa:manifest")
-        title = m.get("title")
         fmt = m.get("format")
+        is_update_manifest = bool(m.get("is_update_manifest", m.get("isUpdateManifest", False)))
 
         # Claim resolution: claim, claim.v2, or root level
         claim = m.get("claim", {}) or m.get("claim.v2", {})
+        title = m.get("title") or (claim.get("dc:title") or claim.get("title") if isinstance(claim, dict) else None)
 
         # Generator resolution
         generator = None
@@ -305,7 +315,25 @@ def parse_crjson(
             if isinstance(s, dict):
                 code = s.get("code", "")
                 explanation = s.get("explanation")
-                sev = Severity.ERROR if ("invalid" in code.lower() or "mismatch" in code.lower() or "error" in code.lower()) else Severity.INFO
+                lowered_code = code.lower()
+                is_err = any(
+                    kw in lowered_code
+                    for kw in (
+                        "not",
+                        "invalid",
+                        "mismatch",
+                        "missing",
+                        "untrusted",
+                        "unsupported",
+                        "malformed",
+                        "revoked",
+                        "expired",
+                        "rejected",
+                        "fail",
+                        "error",
+                    )
+                )
+                sev = Severity.ERROR if is_err else Severity.INFO
                 status_list.append(ValidationStatus(code=code, explanation=explanation, severity=sev))
 
         # Check v2 validationResults
@@ -326,7 +354,7 @@ def parse_crjson(
             title=title,
             format=fmt,
             claim_generator=generator,
-            is_update_manifest=False,
+            is_update_manifest=is_update_manifest,
             signature=sig_obj,
             assertions=assertions_list,
             validation_statuses=status_list,
