@@ -94,6 +94,13 @@ make swift-test    # Run Swift test suite
 make wasm-test     # Build TypeScript SDK and run Vitest suite
 make test          # Run Python, Go, Swift, and WASM test suites
 
+# Refresh local prebuilt Swift XCFramework and WASM binaries from a GitHub Release (without a full Bazel build):
+# Note: swift/Package.swift prioritizes a local swift/CredentioC.xcframework directory if present on disk.
+# If swift/CredentioC.xcframework is stale (e.g. from an older release), remove it or unpack the latest release zip:
+gh release download v0.2.2 -p 'CredentioC.xcframework.zip' -p 'credentio.wasm' -p 'credentio.js' -D /tmp --clobber
+rm -rf swift/CredentioC.xcframework && unzip -q /tmp/CredentioC.xcframework.zip -d swift/
+cp /tmp/credentio.wasm /tmp/credentio.js wasm/lib/ && cp /tmp/credentio.wasm /tmp/credentio.js wasm/dist/
+
 # Documentation site (Astro Starlight):
 make docs-serve    # Launch local development server
 make docs-build    # Compile production static build in docs-site/dist/
@@ -114,16 +121,18 @@ make clean
    The repository owner is `ghchinoy` (`github.com/ghchinoy/credentio-contributions`). Upstream Google Credentio is `mediaprovenance.googlesource.com/credentio` and should be linked when referencing authoritative C++ source or specifications.
 4. **Two-Step Release & Prebuilt Distribution Workflow:**
    Compiled binaries (`libcredentio_c.{dylib,so}`, `CredentioC.xcframework.zip`, `credentio.wasm`, Python wheels, and `ghchinoy-credentio-wasm-<ver>.tgz`) are `.gitignore`d and distributed via GitHub Releases. To avoid CI chicken-and-egg failures when cutting a new release `vX.Y.Z`, always use two commits:
-   - **Commit 1 (Pre-Release Version Bump & Tag):** Update version strings in `native/credentio_c.cc`, `python/pyproject.toml`, `python/src/credentio/__init__.py`, `go/cmd/credentio/main.go`, `swift/Sources/credentio-cli/CredentioCLI.swift`, `wasm/package.json`, and documentation. Keep `swift/Package.swift` and `scripts/fetch-prebuilt-lib.sh` pointing to the *previous* release until the new release finishes building. Commit, push `main`, and push tags `vX.Y.Z` and `go/vX.Y.Z` to trigger `.github/workflows/release.yml`.
+   - **Commit 1 (Pre-Release Version Bump & Tag):** Update version strings in `native/credentio_c.h`, `native/credentio_c.cc`, `python/pyproject.toml`, `python/src/credentio/__init__.py`, `python/src/credentio/signer.py`, `go/cmd/credentio/main.go`, `go/signer.go`, `swift/Sources/credentio-cli/CredentioCLI.swift`, `swift/Sources/CredentioKit/Engines/CredentioSigner.swift`, `wasm/package.json` (plus `cd wasm && npm install --package-lock-only`), `wasm/src/signer.ts`, and documentation. Verify with `git grep -n "<prev_version>"` that only the 4 post-release asset-pinning files remain on `<prev_version>`. Keep `swift/Package.swift` and `scripts/fetch-prebuilt-lib.sh` pointing to the *previous* release until the new release finishes building. Commit, push `main`, and push tags `vX.Y.Z` and `go/vX.Y.Z` to trigger `.github/workflows/release.yml`.
    - **Commit 2 (Post-Release Asset Pinning):** Once `release.yml` publishes the `vX.Y.Z` assets, fetch `CredentioC.xcframework.zip.sha256` from the release and update `swift/Package.swift` (`releaseVersion` + `remoteChecksum`), `scripts/fetch-prebuilt-lib.sh`, `plugins/c2pa-inspector/skills/c2pa-inspect/scripts/fetch_native_lib.sh`, and `.github/workflows/ci.yml`.
-5. **Upstream Commit Pinning & Drift Detection:**
-   Build scripts source the authoritative commit from `.credentio-pin` (baseline: `ee4078badeea5739b0f0f246dbaea7803382718b`). Run `make check-drift` or trigger the scheduled `drift-check.yml` workflow to detect upstream movement prior to bumping the baseline.
+5. **Upstream Commit Pinning, Local Checkout Sync & Drift Detection:**
+   Build scripts source the authoritative commit from `.credentio-pin` (baseline: `ee4078badeea5739b0f0f246dbaea7803382718b`). Run `make check-drift` or trigger the scheduled `drift-check.yml` workflow to detect upstream movement on `refs/heads/main` prior to bumping the baseline. To inspect pending upstream Gerrit CLs before they merge, run `git ls-remote https://mediaprovenance.googlesource.com/credentio 'refs/changes/*'`. When working with a local sibling checkout at `../credentio`, keep `../credentio/bindings_c/` synced with `native/{credentio_c.h,credentio_c.cc,BUILD}`.
 6. **Architecture Decisions:**
    Substantial architectural choices, FFI changes, or engine models must be recorded as Architecture Decision Records in `docs/adr/`.
 7. **CGO Dynamic Linking and Runtime RPATH:**
    When working with CGo bindings on macOS (`darwin`), always ensure `-Wl,-rpath,${SRCDIR}/lib -Wl,-rpath,${SRCDIR}/../native` is defined in `#cgo darwin LDFLAGS`. macOS System Integrity Protection (SIP) sanitizes `DYLD_LIBRARY_PATH` across subprocesses, so embedded rpaths are required for downstream Go applications and tests to resolve `libcredentio_c.dylib` seamlessly. Ensure `CGO_ENABLED=1` is specified during builds and test executions.
-8. **C2PA Manifest Schema Resilience:**
-   `ParseCrJSON` implementations across all language bindings (Go, Python, Swift, WebAssembly) must accommodate both camelCase and snake_case variations as well as C2PA v1 and v2 payload schemas (e.g. `claim` vs `claim.v2`, `certificateInfo` with `issuer.CN`, and `validationResults` categorizing `success`, `failure`, and `informational` entries).
+8. **C2PA Manifest Schema & Format Resilience:**
+   - **Five Lockstep `ParseCrJSON` Implementations:** Keep all five parsers synchronized: `go/models.go`, `python/src/credentio/models.py`, `swift/Sources/CredentioKit/Engines/CredentioCrjsonMapper.swift`, `wasm/src/parser.ts`, and `plugins/c2pa-inspector/skills/c2pa-inspect/scripts/inspect_c2pa.py`.
+   - **Upstream `crJSON` Field Locations:** Upstream `ConvertToCrJson` (`utils/crjson.cc`) emits `specVersion` inside `manifests[i].validationResults.specVersion` and `manifests[i]["claim.v2"].specVersion` (not at the root JSON object), emits `dc:title` inside `claim.v2`, and uses camelCase `isUpdateManifest`. All parsers must check both root and per-manifest locations, accommodate C2PA v1 and v2 schemas (`claim` vs `claim.v2`, `certificateInfo.issuer.CN`, `validationResults` categorizing `success`, `failure`, and `informational`), and classify failure keywords (`not`, `invalid`, `mismatch`, `missing`, `untrusted`, `unsupported`, `malformed`, `revoked`, `expired`, `rejected`, `fail`, `error`) as `ERROR`.
+   - **OOXML / ZIP Validation Routing:** Upstream `CreateZipFormat()` (`formats/zip/format.cc`) registers only the three OOXML MIME types (`.docx`, `.pptx`, `.xlsx`), not `"application/zip"`. In `native/credentio_c.cc`, never let `SniffMediaType` returning `"application/zip"` override `credentio::MediaType(file_path)`, and pass `std::nullopt` to `Validator::Validate` when the media type is `"application/zip"` so `FormatRegistry::GetFormat(reader)` resolves via `ZipAssessor::IsSupported(reader)`.
 9. **Agent-Aware CLI Design:**
    CLI applications consuming these bindings should adhere to Agent-Aware standards: logical Cobra `GroupID` command categorization, structured `--json` output flags, proactive error hints, and semantic Lipgloss color palettes.
 10. **C-ABI Surface & Emscripten Export Synchronization:**
