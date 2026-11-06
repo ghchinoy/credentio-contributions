@@ -1,6 +1,5 @@
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
-import catppuccin from '@catppuccin/starlight';
 
 // https://astro.build/config
 export default defineConfig({
@@ -10,12 +9,7 @@ export default defineConfig({
 		starlight({
 			title: 'Credentio Contributions',
 			description: 'High-performance Python, Go, Swift, WebAssembly, and Agent Plugin bindings for Google Credentio C2PA Content Credentials validator',
-			plugins: [
-				catppuccin({
-					dark: { flavor: 'mocha', accent: 'sky' },
-					light: { flavor: 'latte', accent: 'sky' },
-				}),
-			],
+			customCss: ['./src/styles/tokens.css'],
 			social: [
 				{
 					icon: 'github',

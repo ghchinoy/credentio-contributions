@@ -1,0 +1,133 @@
+/*
+ * tokens.css — the brand seam.
+ *
+ * ONE stylesheet, mapping Starlight's own `--sl-*` custom properties, so the
+ * catalog is visibly its own thing rather than stock Starlight. Restrained on
+ * purpose: a palette, a type scale and two accents. No glassmorphism, no
+ * gradients on text, no animation.
+ *
+ * This file is also the artefact site B copies (proposal §5). Copy, do not
+ * package: a published theme package needs a registry, a version, a release
+ * process and a build-order constraint in two repos, to deduplicate about a
+ * hundred lines of CSS variables between two sites owned by one person. Drift
+ * is visible (the sites stop matching) and cheap to fix (copy again). Revisit
+ * at a third site.
+ *
+ * Every value below is a presentation choice. Nothing here encodes a fact
+ * about the catalog.
+ */
+
+@font-face {
+  font-family: "Google Sans Flex";
+  src: url("../assets/fonts/google-sans-flex.woff2") format("woff2");
+  font-weight: 100 1000;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Google Sans Code";
+  src: url("../assets/fonts/google-sans-code.woff2") format("woff2");
+  font-weight: 300 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  /* GM3 dark surfaces (#0f1013 canvas, #15171b/#1b1e23 containers) and Google Blue accent. */
+  --sl-color-accent-low: #041e49;
+  --sl-color-accent: #7cacf8;
+  --sl-color-accent-high: #d3e3fd;
+
+  --sl-color-white: #ffffff;
+  --sl-color-gray-1: #e8eaed;
+  --sl-color-gray-2: #c4c7c5;
+  --sl-color-gray-3: #9aa0a6;
+  --sl-color-gray-4: #5f6368;
+  --sl-color-gray-5: #2b3037;
+  --sl-color-gray-6: #15171b;
+  --sl-color-gray-7: #1b1e23;
+  --sl-color-black: #0f1013;
+
+  --sl-color-bg: #0f1013;
+  --sl-color-bg-nav: #0f1013;
+  --sl-color-bg-sidebar: #15171b;
+  --sl-color-bg-inline-code: #1b1e23;
+  --sl-color-hairline-light: #2b3037;
+  --sl-color-hairline: #2b3037;
+  --sl-color-hairline-shade: #2b3037;
+
+  --sl-content-width: 50rem;
+}
+
+:root[data-theme="light"] {
+  /* GM3 light surfaces (#ffffff canvas, #f8f9fa/#f1f3f4 containers) and Google Blue accent. */
+  --sl-color-accent-low: #e8f0fe;
+  --sl-color-accent: #0b57d0;
+  --sl-color-accent-high: #041e49;
+
+  --sl-color-white: #1f1f1f;
+  --sl-color-gray-1: #23272d;
+  --sl-color-gray-2: #3c4043;
+  --sl-color-gray-3: #5f6368;
+  --sl-color-gray-4: #80868b;
+  --sl-color-gray-5: #dadce0;
+  --sl-color-gray-6: #f1f3f4;
+  --sl-color-gray-7: #f8f9fa;
+  --sl-color-black: #ffffff;
+
+  --sl-color-bg: #ffffff;
+  --sl-color-bg-nav: #ffffff;
+  --sl-color-bg-sidebar: #f8f9fa;
+  --sl-color-bg-inline-code: #f1f3f4;
+  --sl-color-hairline-light: #dadce0;
+  --sl-color-hairline: #dadce0;
+  --sl-color-hairline-shade: #dadce0;
+}
+
+/* Type: self-hosted Google Sans Flex (OFL) and Google Sans Code (OFL). */
+:root {
+  --sl-font: "Google Sans Flex", system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --sl-font-mono: "Google Sans Code", ui-monospace, SFMono-Regular, "SF Mono",
+    Menlo, Consolas, "Liberation Mono", monospace;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--sl-color-accent-low);
+  color: var(--sl-color-accent-high);
+}
+
+/* The site title reads as an identifier, matching the catalog's subject. */
+.site-title {
+  letter-spacing: -0.015em;
+  font-weight: 500;
+}
+
+.sl-markdown-content :is(h1, h2, h3) {
+  letter-spacing: -0.015em;
+  font-weight: 500;
+  text-wrap: balance;
+}
+
+/* Long declared descriptions (up to 790 characters in this repo) are rendered
+   in full and unclipped — no line-clamp, no ellipsis, no max-height. I9. */
+.sl-markdown-content p,
+.entry-description {
+  text-wrap: pretty;
+}
+
+/* Inline code inside prose: enough contrast to distinguish a filename from
+   surrounding text, which this catalog's bodies do constantly. */
+.sl-markdown-content :not(pre) > code {
+  background: var(--sl-color-gray-6);
+  border: 1px solid var(--sl-color-gray-5);
+  border-radius: 0.25rem;
+  padding: 0.1em 0.35em;
+  font-size: 0.9em;
+}
