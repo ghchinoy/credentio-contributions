@@ -1,4 +1,4 @@
-.PHONY: help build-lib build-swift build-wasm fetch-lib check-drift python-install python-test go-test swift-test wasm-install wasm-build wasm-test test docs-install docs-serve docs-build clean
+.PHONY: help build-lib build-swift build-wasm fetch-lib check-drift analyze-drift python-install python-test go-test swift-test wasm-install wasm-build wasm-test test docs-install docs-serve docs-build clean
 
 help: ## Show this help message
 	@echo "Usage: make [target]"
@@ -25,6 +25,10 @@ fetch-lib: ## Download prebuilt native library from GitHub Releases for Go & Pyt
 check-drift: ## Check if upstream Google Credentio has drifted from .credentio-pin
 	@echo "Checking for upstream Credentio drift..."
 	./scripts/check-credentio-drift.sh
+
+analyze-drift: ## Analyze upstream Google Credentio drift, pending Gerrit CLs, and C-ABI impact
+	@echo "Analyzing upstream Credentio drift and pending Gerrit CLs..."
+	./scripts/analyze-credentio-upstream.sh --include-pending
 
 python-install: ## Install Python credentio package in editable mode
 	@echo "Installing Python package..."

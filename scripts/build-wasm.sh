@@ -83,10 +83,22 @@ run_direct_build() {
     temp_clone="$(mktemp -d /tmp/credentio-wasm-build.XXXXXX)"
     echo "==> [Direct] Cloning Google Credentio (${CREDENTIO_SHA:0:7})..."
     git clone "${CREDENTIO_GIT_URL}" "${temp_clone}/credentio"
-    (cd "${temp_clone}/credentio" && git checkout "${CREDENTIO_SHA}")
+    if ! git -C "${temp_clone}/credentio" cat-file -e "${CREDENTIO_SHA}^{commit}" 2>/dev/null; then
+      git -C "${temp_clone}/credentio" fetch origin "${CREDENTIO_SHA}" || git -C "${temp_clone}/credentio" fetch origin
+    fi
+    git -C "${temp_clone}/credentio" checkout "${CREDENTIO_SHA}"
     credentio_dir="${temp_clone}/credentio"
   else
     echo "==> [Direct] Using local Google Credentio at ${credentio_dir}..."
+    local current_sha
+    current_sha="$(git -C "${credentio_dir}" rev-parse HEAD 2>/dev/null || echo "")"
+    if [[ -n "${CREDENTIO_SHA}" && "${current_sha}" != "${CREDENTIO_SHA}" ]]; then
+      echo "==> [Direct] Syncing local Credentio checkout at ${credentio_dir} to ${CREDENTIO_SHA:0:7}..."
+      if ! git -C "${credentio_dir}" cat-file -e "${CREDENTIO_SHA}^{commit}" 2>/dev/null; then
+        git -C "${credentio_dir}" fetch origin "${CREDENTIO_SHA}" || git -C "${credentio_dir}" fetch origin
+      fi
+      git -C "${credentio_dir}" checkout "${CREDENTIO_SHA}"
+    fi
   fi
 
   local orig_module
@@ -267,6 +279,9 @@ else
       echo '==> [Container] Cloning Google Credentio (${CREDENTIO_SHA:0:7})...'
       git clone ${CREDENTIO_GIT_URL} credentio
       cd credentio
+      if ! git cat-file -e ${CREDENTIO_SHA}^{commit} 2>/dev/null; then
+        git fetch origin ${CREDENTIO_SHA} || git fetch origin
+      fi
       git checkout ${CREDENTIO_SHA}
 
       echo '==> [Container] Configuring emsdk Bazel toolchain...'

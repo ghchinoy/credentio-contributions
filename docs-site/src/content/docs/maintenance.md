@@ -27,7 +27,7 @@ export CREDENTIO_SHA="<custom_git_commit_sha>"
 
 ---
 
-## 2. Checking for Upstream Drift
+## 2. Checking and Analyzing Upstream Drift
 
 You can verify whether Google Credentio's `main` branch has advanced beyond the pinned baseline at any time:
 
@@ -41,15 +41,23 @@ Under the hood, `scripts/check-credentio-drift.sh` queries the upstream Git remo
 - **Drift Detected (Exit code `1`):** Upstream `main` has new commits. The script prints the pinned SHA, the upstream SHA, and a direct GoogleSource log comparison URL (`https://mediaprovenance.googlesource.com/credentio/+log/<pinned>..<upstream>`).
 - **Network Error (Exit code `2`):** Failed to query the remote repository.
 
+To inspect both `refs/heads/main` and open Gerrit release CLs under `refs/changes/*`, classify changed files against our C-ABI headers (`native/credentio_c.cc`), and generate an upgrade recommendation tier (`NONE`, `SKIP_LOW`, `REBUILD_RECOMMENDED`, or `ABI_REVIEW_REQUIRED`), run:
+
+```bash
+make analyze-drift
+```
+
+`scripts/analyze-credentio-upstream.sh` also supports `--target <sha|ref>`, `--json`, and `--markdown` flags for automated agents and CI summaries.
+
 ---
 
 ## 3. Automated Weekly CI Tracking
 
-The repository includes a scheduled GitHub Actions workflow (`.github/workflows/drift-check.yml`) that runs every Monday at 09:00 UTC (and on manual `workflow_dispatch`):
+The repository includes a scheduled GitHub Actions workflow (`.github/workflows/drift-check.yml`) that runs every Monday at 09:00 UTC (and on manual `workflow_dispatch` with an optional `target_ref` input):
 
-1. Executes `scripts/check-credentio-drift.sh`.
-2. When drift is detected, the workflow idempotently opens or updates a tracking issue on GitHub labeled `upstream-drift`.
-3. The tracking issue includes direct comparison links and step-by-step verification instructions.
+1. Executes `scripts/check-credentio-drift.sh` and `scripts/analyze-credentio-upstream.sh`.
+2. When drift is detected (or when a custom `target_ref` is dispatched), `verify-builds` compiles and tests Python, Go, Swift, and WebAssembly against the target commit on macOS.
+3. For `main` branch drift, `report-drift` opens or updates a tracking issue on GitHub labeled `upstream-drift` containing the subsystem impact breakdown and 4-language build verification status.
 
 ---
 
@@ -57,25 +65,25 @@ The repository includes a scheduled GitHub Actions workflow (`.github/workflows/
 
 When upstream Credentio introduces new features or security updates, follow this validation cycle before bumping `.credentio-pin`:
 
-### Step 1: Inspect Upstream Changes
-Review the commit log between the current baseline and upstream `HEAD`:
+### Step 1: Inspect Upstream Changes and Pending CLs
+Run the impact analyzer to review the commit log, affected C-ABI headers, and recommendation tier:
 ```bash
-make check-drift
+make analyze-drift
 ```
 
-### Step 2: Test All Language Bindings
-Verify that native compilation and test suites pass against the new commit:
+### Step 2: Build and Test All Language Bindings
+Verify that native compilation and test suites pass against the new commit across all four targets:
 ```bash
 export CREDENTIO_SHA="<new_upstream_sha>"
 
-# 1. Build and test Python
-make python-test
+# 1. Build C-ABI shared library and test Python & Go
+make build-lib && make python-test && make go-test
 
-# 2. Build and test Go
-make go-test
+# 2. Build static XCFramework and test Swift
+make build-swift && make swift-test
 
-# 3. Build and test Swift
-make swift-test
+# 3. Build WebAssembly engine and test TypeScript SDK
+make build-wasm && make wasm-test
 ```
 
 ### Step 3: Update `.credentio-pin`

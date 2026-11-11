@@ -75,6 +75,9 @@ for f in files:
 # Check if upstream Google Credentio has advanced beyond .credentio-pin:
 make check-drift
 
+# Analyze upstream drift, open Gerrit CLs, and C-ABI impact with recommendation tier:
+make analyze-drift
+
 # Download prebuilt native shared library from GitHub Releases (for Python & Go):
 make fetch-lib
 
@@ -124,7 +127,7 @@ make clean
    - **Commit 1 (Pre-Release Version Bump & Tag):** Update version strings in `native/credentio_c.h`, `native/credentio_c.cc`, `python/pyproject.toml`, `python/src/credentio/__init__.py`, `python/src/credentio/signer.py`, `go/cmd/credentio/main.go`, `go/signer.go`, `swift/Sources/credentio-cli/CredentioCLI.swift`, `swift/Sources/CredentioKit/Engines/CredentioSigner.swift`, `wasm/package.json` (plus `cd wasm && npm install --package-lock-only`), `wasm/src/signer.ts`, and documentation. Verify with `git grep -n "<prev_version>"` that only the 4 post-release asset-pinning files remain on `<prev_version>`. Keep `swift/Package.swift` and `scripts/fetch-prebuilt-lib.sh` pointing to the *previous* release until the new release finishes building. Commit, push `main`, and push tags `vX.Y.Z` and `go/vX.Y.Z` to trigger `.github/workflows/release.yml`.
    - **Commit 2 (Post-Release Asset Pinning):** Once `release.yml` publishes the `vX.Y.Z` assets, fetch `CredentioC.xcframework.zip.sha256` from the release and update `swift/Package.swift` (`releaseVersion` + `remoteChecksum`), `scripts/fetch-prebuilt-lib.sh`, `plugins/c2pa-inspector/skills/c2pa-inspect/scripts/fetch_native_lib.sh`, and `.github/workflows/ci.yml`.
 5. **Upstream Commit Pinning, Local Checkout Sync & Drift Detection:**
-   Build scripts source the authoritative commit from `.credentio-pin` (baseline: `ee4078badeea5739b0f0f246dbaea7803382718b`). Run `make check-drift` or trigger the scheduled `drift-check.yml` workflow to detect upstream movement on `refs/heads/main` prior to bumping the baseline. To inspect pending upstream Gerrit CLs before they merge, run `git ls-remote https://mediaprovenance.googlesource.com/credentio 'refs/changes/*'`. When working with a local sibling checkout at `../credentio`, keep `../credentio/bindings_c/` synced with `native/{credentio_c.h,credentio_c.cc,BUILD}`.
+   Build scripts source the authoritative commit from `.credentio-pin` (baseline: `ee4078badeea5739b0f0f246dbaea7803382718b`). Run `make check-drift` or trigger the scheduled `drift-check.yml` workflow to detect upstream movement on `refs/heads/main` prior to bumping the baseline. Run `make analyze-drift` (`./scripts/analyze-credentio-upstream.sh --include-pending`) to inspect both `refs/heads/main` and open Gerrit release CLs under `refs/changes/*`, classify changed files against `native/credentio_c.cc`, and obtain a deterministic upgrade recommendation tier (`NONE`, `SKIP_LOW`, `REBUILD_RECOMMENDED`, or `ABI_REVIEW_REQUIRED`). When working with a local sibling checkout at `../credentio`, keep `../credentio/bindings_c/` synced with `native/{credentio_c.h,credentio_c.cc,BUILD}`.
 6. **Architecture Decisions:**
    Substantial architectural choices, FFI changes, or engine models must be recorded as Architecture Decision Records in `docs/adr/`.
 7. **CGO Dynamic Linking and Runtime RPATH:**

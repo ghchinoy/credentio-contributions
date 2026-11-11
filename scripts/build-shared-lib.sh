@@ -50,14 +50,17 @@ if [[ -z "${CREDENTIO_DIR}" || ! -d "${CREDENTIO_DIR}" ]]; then
   echo "==> Credentio checkout not found locally. Cloning from ${CREDENTIO_GIT_URL}..."
   CLONE_DIR="$(mktemp -d /tmp/credentio-clone.XXXXXX)"
   git clone "${CREDENTIO_GIT_URL}" "${CLONE_DIR}"
-  (cd "${CLONE_DIR}" && git checkout "${CREDENTIO_SHA}")
+  if ! git -C "${CLONE_DIR}" cat-file -e "${CREDENTIO_SHA}^{commit}" 2>/dev/null; then
+    git -C "${CLONE_DIR}" fetch origin "${CREDENTIO_SHA}" || git -C "${CLONE_DIR}" fetch origin
+  fi
+  git -C "${CLONE_DIR}" checkout "${CREDENTIO_SHA}"
   CREDENTIO_DIR="${CLONE_DIR}"
 else
   CURRENT_SHA="$(git -C "${CREDENTIO_DIR}" rev-parse HEAD 2>/dev/null || echo "")"
   if [[ -n "${CREDENTIO_SHA}" && "${CURRENT_SHA}" != "${CREDENTIO_SHA}" ]]; then
     echo "==> Syncing local Credentio checkout at ${CREDENTIO_DIR} to ${CREDENTIO_SHA:0:7}..."
     if ! git -C "${CREDENTIO_DIR}" cat-file -e "${CREDENTIO_SHA}^{commit}" 2>/dev/null; then
-      git -C "${CREDENTIO_DIR}" fetch origin
+      git -C "${CREDENTIO_DIR}" fetch origin "${CREDENTIO_SHA}" || git -C "${CREDENTIO_DIR}" fetch origin
     fi
     git -C "${CREDENTIO_DIR}" checkout "${CREDENTIO_SHA}"
   fi
