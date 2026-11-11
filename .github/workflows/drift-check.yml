@@ -51,8 +51,8 @@ jobs:
       - name: Run Drift Check & Upstream Impact Analyzer
         id: drift_check
         env:
-          INPUT_TARGET_REF: ${{ inputs.target_ref }}
-          INPUT_INCLUDE_PENDING: ${{ inputs.include_pending }}
+          INPUT_TARGET_REF: ${{ github.event.inputs.target_ref }}
+          INPUT_INCLUDE_PENDING: ${{ github.event.inputs.include_pending }}
         run: |
           set +e
           OUTPUT="$(./scripts/check-credentio-drift.sh 2>&1)"
@@ -91,12 +91,14 @@ jobs:
           ANALYZED_REF="$(echo "$REPORT_JSON" | jq -r '.analyzed_ref')"
           TIER="$(echo "$REPORT_JSON" | jq -r '.recommendation_tier')"
 
-          echo "exit_code=${EXIT_CODE}" >> "$GITHUB_OUTPUT"
-          echo "pinned_sha=${PINNED_SHA}" >> "$GITHUB_OUTPUT"
-          echo "upstream_sha=${UPSTREAM_SHA}" >> "$GITHUB_OUTPUT"
-          echo "analyzed_sha=${ANALYZED_SHA}" >> "$GITHUB_OUTPUT"
-          echo "analyzed_ref=${ANALYZED_REF}" >> "$GITHUB_OUTPUT"
-          echo "recommendation_tier=${TIER}" >> "$GITHUB_OUTPUT"
+          {
+            echo "exit_code=${EXIT_CODE}"
+            echo "pinned_sha=${PINNED_SHA}"
+            echo "upstream_sha=${UPSTREAM_SHA}"
+            echo "analyzed_sha=${ANALYZED_SHA}"
+            echo "analyzed_ref=${ANALYZED_REF}"
+            echo "recommendation_tier=${TIER}"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Upload Drift Analysis Report
         uses: actions/upload-artifact@v4
@@ -109,10 +111,10 @@ jobs:
     name: Verify Builds & Native Bindings (macOS)
     needs: check-drift
     if: needs.check-drift.outputs.exit_code == '1' || (github.event_name == 'workflow_dispatch' && needs.check-drift.outputs.analyzed_sha != needs.check-drift.outputs.pinned_sha)
-    runs-on: macos-14
+    runs-on: macos-15
     env:
       CREDENTIO_SHA: ${{ needs.check-drift.outputs.analyzed_sha }}
-      CREDENTIO_DIR: ${{ runner.temp }}/credentio
+      CREDENTIO_DIR: /tmp/credentio-shared
     steps:
       - uses: actions/checkout@v4
 
@@ -147,6 +149,7 @@ jobs:
 
       - name: Clone Shared Upstream Credentio Checkout
         run: |
+          rm -rf "${CREDENTIO_DIR}"
           git clone https://mediaprovenance.googlesource.com/credentio "${CREDENTIO_DIR}"
           if ! git -C "${CREDENTIO_DIR}" cat-file -e "${CREDENTIO_SHA}^{commit}" 2>/dev/null; then
             git -C "${CREDENTIO_DIR}" fetch origin "${CREDENTIO_SHA}" || git -C "${CREDENTIO_DIR}" fetch origin
